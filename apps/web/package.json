@@ -1,0 +1,32 @@
+{
+	"name": "@boilertowns-example/web",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"build": "next build",
+		"dev": "next dev -p 2023",
+		"start": "next start"
+	},
+	"browserslist": [
+		"defaults",
+		"not dead",
+		"not ie 11",
+		"not op_mini all"
+	],
+	"dependencies": {
+		"@boilertowns-example/ui": "workspace:*",
+		"@emotion/react": "^11.10.5",
+		"@emotion/styled": "^11.10.5",
+		"next": "^13.0.6",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.20.5",
+		"@boilertowns-example/tsconfig": "workspace:*",
+		"next-transpile-modules": "^10.0.0"
+	},
+	"engines": {
+		"node": ">=16"
+	}
+}

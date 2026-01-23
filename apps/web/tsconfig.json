@@ -1,0 +1,16 @@
+{
+	"extends": "@boilertowns-example/tsconfig/web.json",
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@assets/*": ["assets/*"],
+			"@components/*": ["components/*"]
+		},
+		"noEmit": true,
+		"incremental": true,
+		"resolveJsonModule": true,
+		"jsx": "preserve"
+	},
+	"include": ["next-env.d.ts", "**/*.d.ts", "**/*.ts", "**/*.tsx"],
+	"exclude": ["node_modules"]
+}
