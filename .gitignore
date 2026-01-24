@@ -23,6 +23,7 @@ yarn-error.log*
 
 # misc
 .env
+.env.local
 .DS_Store
 .turbo
 .pem
@@ -35,3 +36,6 @@ coverage
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# references
+references
