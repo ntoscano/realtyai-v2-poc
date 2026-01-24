@@ -1,0 +1,32 @@
+{
+	"name": "@boilertowns-example/realty-ai",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"build": "next build",
+		"dev": "next dev -p 2024",
+		"start": "next start",
+		"typecheck": "tsc --noEmit"
+	},
+	"browserslist": [
+		"defaults",
+		"not dead",
+		"not ie 11",
+		"not op_mini all"
+	],
+	"dependencies": {
+		"next": "^14.2.0",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0"
+	},
+	"devDependencies": {
+		"@boilertowns-example/tsconfig": "workspace:*",
+		"@types/node": "^20.11.0",
+		"@types/react": "^18.2.0",
+		"@types/react-dom": "^18.2.0",
+		"typescript": "^5.3.0"
+	},
+	"engines": {
+		"node": ">=18"
+	}
+}
