@@ -3,6 +3,8 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
+		"docker:up": "docker-compose up -d",
+		"docker:down": "docker-compose down",
 		"dev": "nest start --watch",
 		"build": "nest build",
 		"start": "node dist/main",
