@@ -1,3 +1,9 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load environment variables before any other imports that depend on them
+dotenv.config({ path: path.join(__dirname, '../../.env.local') });
+
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { getConfig } from './postgres';

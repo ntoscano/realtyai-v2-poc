@@ -10,8 +10,8 @@
 		"typecheck": "tsc --noEmit",
 		"start": "node dist/main",
 		"start:prod": "node dist/main",
-		"typeorm:migration:new": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate",
-		"typeorm:migration:run": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/config/typeorm.ts",
+		"typeorm:migration:new": "ts-node --project tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate",
+		"typeorm:migration:run": "ts-node --project tsconfig.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/config/typeorm.ts",
 		"migration": "ts-node src/cli/migration.ts",
 		"seed": "ts-node src/cli/seed.ts",
 		"test:db": "ts-node src/cli/test-connection.ts"
