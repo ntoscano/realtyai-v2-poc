@@ -22,23 +22,56 @@ export default function Home() {
 	const [generatedEmail, setGeneratedEmail] = useState<GeneratedEmail | null>(
 		null,
 	);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	const canGenerate = selectedClientId && selectedPropertyId;
+	const canGenerate = selectedClientId && selectedPropertyId && !isLoading;
 
-	const handleGenerate = () => {
+	const handleGenerate = async () => {
 		if (!selectedClientId || !selectedPropertyId) return;
 
-		const client = mockClients.find((c) => c.id === selectedClientId);
-		const property = mockProperties.find((p) => p.id === selectedPropertyId);
+		setIsLoading(true);
+		setError(null);
 
-		if (!client || !property) return;
+		try {
+			const response = await fetch('/api/generate-email', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					clientId: selectedClientId,
+					propertyId: selectedPropertyId,
+					notes: contextNotes || undefined,
+				}),
+			});
 
-		const email = generatePlaceholderEmail(
-			client,
-			property,
-			contextNotes || undefined,
-		);
-		setGeneratedEmail(email);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || `API error: ${response.status}`);
+			}
+
+			const data = await response.json();
+			setGeneratedEmail(data);
+		} catch (err) {
+			console.error('Failed to generate email via API:', err);
+			setError(err instanceof Error ? err.message : 'Failed to generate email');
+
+			// Fallback to placeholder generation
+			const client = mockClients.find((c) => c.id === selectedClientId);
+			const property = mockProperties.find((p) => p.id === selectedPropertyId);
+
+			if (client && property) {
+				const fallbackEmail = generatePlaceholderEmail(
+					client,
+					property,
+					contextNotes || undefined,
+				);
+				setGeneratedEmail(fallbackEmail);
+			}
+		} finally {
+			setIsLoading(false);
+		}
 	};
 
 	return (
@@ -73,15 +106,20 @@ export default function Home() {
 					<ContextInput value={contextNotes} onChange={setContextNotes} />
 				</div>
 
-				<div className="flex justify-center">
+				<div className="flex flex-col items-center gap-2">
 					<Button
 						size="lg"
 						disabled={!canGenerate}
 						onClick={handleGenerate}
 						className="px-8"
 					>
-						Generate Email
+						{isLoading ? 'Generating...' : 'Generate Email'}
 					</Button>
+					{error && (
+						<p className="text-sm text-destructive">
+							{error} (Using placeholder email instead)
+						</p>
+					)}
 				</div>
 
 				<EmailPreview email={generatedEmail} />
