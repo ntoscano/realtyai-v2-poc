@@ -23,6 +23,8 @@
 		"@nestjs/typeorm": "^8.1.4",
 		"dotenv": "^16.0.3",
 		"pg": "^8.11.3",
+		"postgraphile": "^4.7.0",
+		"postgraphile-nest": "^1.0.5",
 		"reflect-metadata": "^0.1.13",
 		"rxjs": "^7.8.1",
 		"typeorm": "^0.3.17",
