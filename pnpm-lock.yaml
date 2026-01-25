@@ -279,6 +279,9 @@ importers:
       '@types/node':
         specifier: ^18.11.12
         version: 18.19.130
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       ts-node:
         specifier: ^10.9.1
         version: 10.9.2(@types/node@18.19.130)(typescript@4.9.5)
@@ -5126,6 +5129,9 @@ packages:
       {
         integrity: sha512-kUNnecmtkunAoQ3CnjmMkzNU/gtxG8guhi+Fk2U/kOpIKjIMKnXGp4IJCgQJrXSgMsWYimYG4TGjz/UzbGEBTw==,
       }
+
+  '@types/pg@8.16.0':
+    resolution: {integrity: sha512-RmhMd/wD+CF8Dfo+cVIy3RR5cl8CyfXQ0tGgW6XBL8L4LM/UTEbNXYRbLwU6w+CgrKBNbrQWt4FUtTfaU5jSYQ==}
 
   '@types/pretty-hrtime@1.0.3':
     resolution:
@@ -22191,6 +22197,12 @@ snapshots:
   '@types/parse-json@4.0.2': {}
 
   '@types/parse5@5.0.3': {}
+
+  '@types/pg@8.16.0':
+    dependencies:
+      '@types/node': 18.19.130
+      pg-protocol: 1.11.0
+      pg-types: 2.2.0
 
   '@types/pretty-hrtime@1.0.3': {}
 
