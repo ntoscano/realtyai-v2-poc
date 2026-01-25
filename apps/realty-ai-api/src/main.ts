@@ -1,3 +1,9 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load .env.local file for local development
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
