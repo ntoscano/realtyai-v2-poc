@@ -1,6 +1,7 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { getConfig } from './postgres';
+import { entities } from './entities';
 
 export function getTypeOrmConfig(): DataSourceOptions {
 	const pgConfig = getConfig();
@@ -12,7 +13,7 @@ export function getTypeOrmConfig(): DataSourceOptions {
 		username: pgConfig.user,
 		password: pgConfig.password,
 		database: pgConfig.database,
-		entities: ['src/**/*.entity.ts'],
+		entities,
 		migrations: ['src/migrations/*.ts'],
 		synchronize: false,
 		logging: process.env.NODE_ENV === 'development',
@@ -30,7 +31,7 @@ export function getTypeOrmModuleConfig(): DataSourceOptions {
 		username: pgConfig.user,
 		password: pgConfig.password,
 		database: pgConfig.database,
-		entities: ['dist/**/*.entity.js'],
+		entities,
 		migrations: ['dist/migrations/*.js'],
 		synchronize: false,
 		logging: process.env.NODE_ENV === 'development',
