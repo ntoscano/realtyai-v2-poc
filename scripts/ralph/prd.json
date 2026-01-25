@@ -1,0 +1,209 @@
+{
+	"project": "RealtyAI",
+	"branchName": "ralph/realty-ai-api",
+	"description": "Realty AI API Backend - NestJS TypeScript backend with PostgreSQL, PostGraphile for GraphQL, and JSONB payload pattern for Property and Client entities",
+	"userStories": [
+		{
+			"id": "US-001",
+			"title": "Create project scaffolding with npm scripts",
+			"description": "As a developer, I need the basic NestJS project structure and npm scripts so I can start building and running the API.",
+			"acceptanceCriteria": [
+				"Create apps/realty-ai-api/package.json with NestJS 8.x dependencies",
+				"Include scripts: dev (watch mode), build, start, typeorm:migration:new, typeorm:migration:run, migration (clean), seed",
+				"Create apps/realty-ai-api/tsconfig.json with decorator support and path aliases",
+				"Create apps/realty-ai-api/nest-cli.json",
+				"Create apps/realty-ai-api/.env.example with all required environment variables",
+				"Create apps/realty-ai-api/.env.local with working local values",
+				"Run pnpm install successfully from monorepo root",
+				"Typecheck passes"
+			],
+			"priority": 1,
+			"passes": true,
+			"notes": ""
+		},
+		{
+			"id": "US-002",
+			"title": "Create Docker Compose for PostgreSQL",
+			"description": "As a developer, I need a local PostgreSQL instance so I can develop and test the API.",
+			"acceptanceCriteria": [
+				"Create apps/realty-ai-api/docker-compose.yml with postgres:16-alpine image",
+				"PostgreSQL runs on port 54320 (shared with notepad-api)",
+				"Default credentials: postgres/docker",
+				"Volume for data persistence: realty_ai_pgdata",
+				"pnpm docker:up starts the container successfully",
+				"Typecheck passes"
+			],
+			"priority": 2,
+			"passes": true,
+			"notes": ""
+		},
+		{
+			"id": "US-003",
+			"title": "Create database configuration",
+			"description": "As a developer, I need database configuration utilities so TypeORM can connect to PostgreSQL.",
+			"acceptanceCriteria": [
+				"Create src/config/postgres.ts with getConfig(), getAdminConfig(), getClient() functions",
+				"Create src/config/typeorm.ts with TypeORM ConnectionOptions using SnakeNamingStrategy",
+				"Create src/config/roles.ts with DbRoles enum (Author, Anon, Super)",
+				"Create src/config/nest.ts with NestJS application options",
+				"Configuration reads from environment variables",
+				"Typecheck passes"
+			],
+			"priority": 3,
+			"passes": true,
+			"notes": ""
+		},
+		{
+			"id": "US-004",
+			"title": "Create environment configuration",
+			"description": "As a developer, I need environment configuration so the API can connect to the existing database.",
+			"acceptanceCriteria": [
+				"Create apps/realty-ai-api/.env.local with working database credentials",
+				"Database realty-ai already exists (created via pgAdmin)",
+				"Connection uses: host=localhost, port=54320, user=dtxs1, password=password",
+				"Environment variables match .env.example template",
+				"API can connect to database when started",
+				"Typecheck passes"
+			],
+			"priority": 4,
+			"passes": true,
+			"notes": ""
+		},
+		{
+			"id": "US-005",
+			"title": "Create Property entity",
+			"description": "As a developer, I need a Property entity so I can store real estate listings.",
+			"acceptanceCriteria": [
+				"Create src/modules/property/property.entity.ts",
+				"Entity has columns: id (uuid), type (varchar), name (varchar), slug (varchar nullable), payload (jsonb), meta (jsonb), createdAt, updatedAt",
+				"Payload interface includes: address, city, state, price, beds, baths, sqft, property_type, highlights[], neighborhood_description",
+				"Entity uses @Entity() decorator (table name: property)",
+				"Typecheck passes"
+			],
+			"priority": 5,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-006",
+			"title": "Create Client entity",
+			"description": "As a developer, I need a Client entity so I can store client information.",
+			"acceptanceCriteria": [
+				"Create src/modules/client/client.entity.ts",
+				"Entity has columns: id (uuid), type (varchar), name (varchar), email (varchar), slug (varchar nullable), payload (jsonb), meta (jsonb), createdAt, updatedAt",
+				"Payload interface includes: buying_stage, preferences[], budget_range, lifestyle_notes, communication_style",
+				"Entity uses @Entity() decorator (table name: client)",
+				"Email column has index for lookups",
+				"Typecheck passes"
+			],
+			"priority": 6,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-007",
+			"title": "Create entity registry",
+			"description": "As a developer, I need entities registered so TypeORM can manage them.",
+			"acceptanceCriteria": [
+				"Create src/config/entities.ts exporting entities array",
+				"Array includes Property and Client entities",
+				"TypeORM config imports entities from this file",
+				"Typecheck passes"
+			],
+			"priority": 7,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-008",
+			"title": "Create initial database migration",
+			"description": "As a developer, I need a migration to create the database schema using the two-step migration process.",
+			"acceptanceCriteria": [
+				"Run pnpm typeorm:migration:new InitialSchema to auto-generate migration from entities",
+				"Run pnpm migration clean to clean up generated migration (removes unnecessary statements)",
+				"Migration creates property table with all columns",
+				"Migration creates client table with all columns",
+				"Migration creates indexes on client.email",
+				"Migration has working up() and down() methods",
+				"pnpm typeorm:migration:run executes successfully",
+				"Tables exist in database after migration",
+				"Typecheck passes"
+			],
+			"priority": 8,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-009",
+			"title": "Create NestJS application bootstrap",
+			"description": "As a developer, I need the main application entry point so the API can start.",
+			"acceptanceCriteria": [
+				"Create src/app.service.ts with health check method",
+				"Create src/app.controller.ts with GET / and GET /health endpoints",
+				"Create src/app.module.ts importing TypeOrmModule and all feature modules",
+				"Create src/main.ts bootstrapping NestJS on port 3001",
+				"pnpm dev starts the server",
+				"curl http://localhost:3001/health returns {\"status\":\"ok\"}",
+				"Typecheck passes"
+			],
+			"priority": 9,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-010",
+			"title": "Configure PostGraphile for GraphQL",
+			"description": "As a developer, I need PostGraphile configured so the frontend can query data via GraphQL.",
+			"acceptanceCriteria": [
+				"Install postgraphile and postgraphile-nest packages",
+				"Create src/config/graphile.ts with PostGraphile options",
+				"Enable GraphiQL playground at /graphiql in development",
+				"GraphQL endpoint available at /graphql",
+				"Register PostGraphile module in app.module.ts",
+				"Navigate to http://localhost:3001/graphiql shows GraphiQL interface",
+				"Can query { allProperties { nodes { id name payload } } } successfully",
+				"Typecheck passes"
+			],
+			"priority": 10,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-011",
+			"title": "Create seed script for mock data",
+			"description": "As a developer, I need to seed the database with existing mock data so I have realistic test data.",
+			"acceptanceCriteria": [
+				"Create src/cli/seed.ts CLI script",
+				"Script inserts 15 properties from existing mockProperties data in apps/realty-ai/src/data/mockProperties.ts",
+				"Script inserts 15 clients from existing mockClients data in apps/realty-ai/src/data/mockClients.ts",
+				"Property payload contains: address, city, state, price, beds, baths, sqft, property_type, highlights, neighborhood_description",
+				"Client payload contains: buying_stage, preferences, budget_range, lifestyle_notes, communication_style",
+				"pnpm seed runs successfully",
+				"Data appears in GraphiQL queries",
+				"Typecheck passes"
+			],
+			"priority": 11,
+			"passes": false,
+			"notes": ""
+		},
+		{
+			"id": "US-012",
+			"title": "Connect frontend to GraphQL API",
+			"description": "As a developer, I need the realty-ai frontend to connect to the new backend so it can fetch real data.",
+			"acceptanceCriteria": [
+				"Install GraphQL client dependencies in apps/realty-ai (e.g., @apollo/client or urql)",
+				"Create GraphQL client configuration in apps/realty-ai/src/lib/graphql/client.ts",
+				"Create environment variable NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3001/graphql",
+				"Create apps/realty-ai/src/lib/graphql/queries.ts with queries for properties and clients",
+				"Update existing mock data usage to fetch from GraphQL (or provide option to use real data)",
+				"Frontend can successfully query properties from backend",
+				"Frontend can successfully query clients from backend",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill"
+			],
+			"priority": 12,
+			"passes": false,
+			"notes": ""
+		}
+	]
+}

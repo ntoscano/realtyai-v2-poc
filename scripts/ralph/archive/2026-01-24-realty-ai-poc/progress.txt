@@ -1,0 +1,13 @@
+# Realty AI API Backend - Progress Log
+
+## Codebase Patterns
+- Monorepo uses pnpm workspaces with apps/ and packages/ directories
+- NestJS 8.x with TypeORM 0.2.x and PostGraphile 4.7.0 (follow notepad-api patterns)
+- Entity pattern: minimal indexed columns (id, type, name, email) with bulk data in JSONB payload
+- Use SnakeNamingStrategy for database columns (camelCase in code → snake_case in DB)
+- Two-step migration process: typeorm:migration:new to generate, then migration clean to remove unnecessary statements
+- Database realty-ai already exists on port 54320 (created via pgAdmin)
+- Reference implementation: /references/notepad-api/
+
+---
+

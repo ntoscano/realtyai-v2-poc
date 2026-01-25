@@ -1,0 +1,98 @@
+# Ralph Progress Log
+Started: Sat Jan 24 19:14:00 PST 2026
+---
+
+## Codebase Patterns
+- NestJS apps in this monorepo need separate eslint/prettier configs because the root config uses @trivago/prettier-plugin-sort-imports which doesn't support decorators
+- Add apps/realty-ai-api to .prettierignore and .eslintrc.js ignorePatterns to avoid decorator parsing errors
+- Use `root: true` in app-level .eslintrc.js to prevent inheritance from root config
+- NestJS CLI requires tsconfig.build.json in the app directory
+- Use dotenv.config() with explicit path for .env.local loading (dotenv/config only loads .env)
+
+---
+
+## 2026-01-24 19:21:00 - US-001
+- What was implemented:
+  - Created apps/realty-ai-api/package.json with NestJS 8.x dependencies
+  - Created npm scripts: dev, build, start, typeorm:migration:new, typeorm:migration:run, migration, seed
+  - Created tsconfig.json with decorator support and @/* path alias
+  - Created nest-cli.json
+  - Created .env.example and .env.local with database credentials
+  - Created minimal src/main.ts and src/app.module.ts for typecheck verification
+  - Created app-level .eslintrc.js for NestJS decorator support
+- Files changed:
+  - apps/realty-ai-api/package.json (new)
+  - apps/realty-ai-api/tsconfig.json (new)
+  - apps/realty-ai-api/nest-cli.json (new)
+  - apps/realty-ai-api/.env.example (new)
+  - apps/realty-ai-api/.env.local (new)
+  - apps/realty-ai-api/.eslintrc.js (new)
+  - apps/realty-ai-api/src/main.ts (new)
+  - apps/realty-ai-api/src/app.module.ts (new)
+  - .eslintrc.js (modified - added ignorePatterns for api app)
+  - .prettierignore (modified - added api app)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - Root eslint/prettier configs in this monorepo don't support TypeScript decorators
+  - Must add NestJS apps to .prettierignore and eslintrc ignorePatterns
+  - App needs its own .eslintrc.js with `root: true` and parserOptions.project pointing to local tsconfig
+  - Database credentials: host=localhost, port=54320, user=dtxs1, password=password, db=realty-ai
+---
+
+## 2026-01-24 20:45:00 - US-002
+- What was implemented:
+  - Created apps/realty-ai-api/docker-compose.yml with postgres:16-alpine image
+  - PostgreSQL configured on port 54320 with postgres/docker credentials
+  - Added realty_ai_pgdata volume for data persistence
+  - Added docker:up and docker:down scripts to package.json
+- Files changed:
+  - apps/realty-ai-api/docker-compose.yml (new)
+  - apps/realty-ai-api/package.json (modified - added docker scripts)
+- **Learnings for future iterations:**
+  - There's already a shared PostgreSQL container `pg` running on port 54320
+  - The existing container uses different credentials (dtxs1/password) than the docker-compose (postgres/docker)
+  - The .env.local references dtxs1 credentials which work with the existing shared container
+  - docker-compose.yml was created per PRD spec but would conflict if run alongside existing pg container
+---
+
+## 2026-01-24 21:15:00 - US-003
+- What was implemented:
+  - Created src/config/postgres.ts with getConfig(), getAdminConfig(), getClient() functions
+  - Created src/config/typeorm.ts with TypeORM DataSourceOptions using SnakeNamingStrategy
+  - Created src/config/roles.ts with DbRoles enum (Author, Anon, Super)
+  - Created src/config/nest.ts with NestJS application options
+  - Added @types/pg devDependency for TypeScript support
+- Files changed:
+  - apps/realty-ai-api/src/config/postgres.ts (new)
+  - apps/realty-ai-api/src/config/typeorm.ts (new)
+  - apps/realty-ai-api/src/config/roles.ts (new)
+  - apps/realty-ai-api/src/config/nest.ts (new)
+  - apps/realty-ai-api/package.json (modified - added @types/pg)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - TypeORM 0.3.x uses DataSource and DataSourceOptions instead of Connection/ConnectionOptions
+  - The typeorm.ts exports a default DataSource for CLI usage (migrations) and getTypeOrmModuleConfig() for NestJS module
+  - Need @types/pg for pg Client type definitions
+  - postgres.ts provides low-level pg Client access, useful for raw SQL operations
+---
+
+## 2026-01-24 19:32:00 - US-004
+- What was implemented:
+  - Added dotenv dependency for environment variable loading
+  - Updated src/main.ts to load .env.local file at startup
+  - Created src/cli/test-connection.ts script to verify database connectivity
+  - Added typecheck and test:db scripts to package.json
+  - Created tsconfig.build.json required by NestJS CLI
+- Files changed:
+  - apps/realty-ai-api/package.json (modified - added dotenv, typecheck, test:db scripts)
+  - apps/realty-ai-api/src/main.ts (modified - added dotenv loading)
+  - apps/realty-ai-api/src/cli/test-connection.ts (new)
+  - apps/realty-ai-api/tsconfig.build.json (new)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - NestJS CLI requires tsconfig.build.json to run `nest start --watch`
+  - dotenv/config only loads .env, not .env.local - need to use dotenv.config() with explicit path
+  - For CLI scripts, use path.join(__dirname, '../../.env.local') from src/cli/
+  - For main.ts, use path.join(__dirname, '../.env.local') since it's in src/
+  - pnpm test:db can be used to verify database connectivity before running the full API
+---
