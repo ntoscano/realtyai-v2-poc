@@ -1,3 +1,4 @@
+import type { GeneratedEmail } from '@/types/email';
 import {
 	createClientDocument,
 	createPropertyDocument,
@@ -5,6 +6,7 @@ import {
 } from './documentLoaders';
 import { emailPromptTemplate } from './emailPrompt';
 import type { EmailGraphStateType } from './graphState';
+import { llm } from './llm';
 import { fetchWeather } from './weatherFetcher';
 
 /**
@@ -113,6 +115,88 @@ export async function promptAssemblyNode(
 	return {
 		final_prompt: formattedPrompt,
 	};
+}
+
+/**
+ * Parse the LLM response to extract SUBJECT: and BODY: sections.
+ * Returns a GeneratedEmail object with subject and body.
+ */
+function parseEmailResponse(response: string): GeneratedEmail {
+	// Default fallback values
+	const fallbackEmail: GeneratedEmail = {
+		subject: 'A Property You Might Love',
+		body:
+			response.trim() ||
+			'I found a property that might interest you. Please let me know if you would like more details.',
+	};
+
+	// Try to parse SUBJECT: and BODY: sections
+	const subjectMatch = response.match(/SUBJECT:\s*(.+?)(?=\n|BODY:|$)/i);
+	const bodyMatch = response.match(/BODY:\s*([\s\S]+?)$/i);
+
+	if (!subjectMatch || !bodyMatch) {
+		// If we can't parse the expected format, return fallback
+		console.warn('Could not parse email response format, using fallback');
+		return fallbackEmail;
+	}
+
+	const subject = subjectMatch[1].trim();
+	const body = bodyMatch[1].trim();
+
+	// Validate we have non-empty values
+	if (!subject || !body) {
+		console.warn('Parsed empty subject or body, using fallback');
+		return fallbackEmail;
+	}
+
+	return { subject, body };
+}
+
+/**
+ * Generation node: invokes the LLM to generate the email.
+ * Parses the response to extract SUBJECT: and BODY: sections.
+ */
+export async function generationNode(
+	state: EmailGraphStateType,
+): Promise<Partial<EmailGraphStateType>> {
+	const { final_prompt } = state;
+
+	if (!final_prompt) {
+		throw new Error('Final prompt is required for generation');
+	}
+
+	try {
+		// Invoke the LLM with the assembled prompt
+		const response = await llm.invoke(final_prompt);
+
+		// Extract the text content from the response
+		const responseText =
+			typeof response.content === 'string'
+				? response.content
+				: Array.isArray(response.content)
+				? response.content
+						.filter((block) => typeof block === 'object' && 'text' in block)
+						.map((block) => (block as { text: string }).text)
+						.join('')
+				: '';
+
+		// Parse the response to extract subject and body
+		const generatedEmail = parseEmailResponse(responseText);
+
+		return {
+			generated_email: generatedEmail,
+		};
+	} catch (error) {
+		console.error('Error generating email:', error);
+
+		// Return fallback email on error
+		return {
+			generated_email: {
+				subject: 'A Property You Might Love',
+				body: 'I found a property that might interest you. Please let me know if you would like more details.',
+			},
+		};
+	}
 }
 
 /**
