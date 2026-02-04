@@ -81,7 +81,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -97,7 +97,7 @@
 				"Typecheck passes"
 			],
 			"priority": 6,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -111,7 +111,7 @@
 				"Typecheck passes"
 			],
 			"priority": 7,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -119,6 +119,7 @@
 			"title": "Create initial database migration",
 			"description": "As a developer, I need a migration to create the database schema using the two-step migration process.",
 			"acceptanceCriteria": [
+				"check /Users/ntoscano/dev/aiSandbox/realtyai-v2-poc/references/notepad-api/README.md for reference",
 				"Run pnpm typeorm:migration:new InitialSchema to auto-generate migration from entities",
 				"Run pnpm migration clean to clean up generated migration (removes unnecessary statements)",
 				"Migration creates property table with all columns",
@@ -130,7 +131,7 @@
 				"Typecheck passes"
 			],
 			"priority": 8,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -147,7 +148,7 @@
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -165,7 +166,7 @@
 				"Typecheck passes"
 			],
 			"priority": 10,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -183,7 +184,7 @@
 				"Typecheck passes"
 			],
 			"priority": 11,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		},
 		{
@@ -202,7 +203,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 12,
-			"passes": false,
+			"passes": true,
 			"notes": ""
 		}
 	]
