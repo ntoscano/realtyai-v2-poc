@@ -186,16 +186,28 @@ export async function generationNode(
 		return {
 			generated_email: generatedEmail,
 		};
-	} catch (error) {
-		console.error('Error generating email:', error);
+	} catch (error: unknown) {
+		const errName = error instanceof Error ? error.name : 'UnknownError';
+		const errMessage = error instanceof Error ? error.message : String(error);
 
-		// Return fallback email on error
-		return {
-			generated_email: {
-				subject: 'A Property You Might Love',
-				body: 'I found a property that might interest you. Please let me know if you would like more details.',
-			},
-		};
+		console.error(
+			`[generationNode] LLM invocation failed (${errName}): ${errMessage}`,
+		);
+
+		// Surface auth/config errors so developers can diagnose quickly
+		if (
+			errName === 'AccessDeniedException' ||
+			errMessage.includes('Authentication failed')
+		) {
+			console.error(
+				'[generationNode] AWS Bedrock credentials are invalid or expired. ' +
+					'Update AI_AWS_BEDROCK_ACCESS_KEY_ID and AI_AWS_BEDROCK_SECRET_ACCESS_KEY in .env.local',
+			);
+		}
+
+		// Re-throw so the API route can return a proper error response
+		// instead of silently returning a generic fallback email
+		throw new Error(`LLM generation failed: ${errMessage}`);
 	}
 }
 

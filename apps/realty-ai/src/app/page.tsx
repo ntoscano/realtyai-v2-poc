@@ -5,30 +5,15 @@ import { ContextInput } from '@/components/ContextInput';
 import { EmailPreview } from '@/components/EmailPreview';
 import { PropertySelector } from '@/components/PropertySelector';
 import { Button } from '@/components/ui/button';
-import { mockClients } from '@/data/mockClients';
-import { mockProperties } from '@/data/mockProperties';
+// DATA SOURCE: Currently using MOCK data.
+// To switch to live backend, change to: import { useLiveData as useData } from '@/lib/data/useLiveData';
+import { useLiveData as useData } from '@/lib/data/useLiveData';
 import { generatePlaceholderEmail } from '@/lib/generatePlaceholderEmail';
-import { useClients, useProperties } from '@/lib/graphql/hooks';
 import { type GeneratedEmail } from '@/types/email';
 import { useState } from 'react';
 
 export default function Home() {
-	// Fetch data from GraphQL API
-	const {
-		properties: graphqlProperties,
-		loading: propertiesLoading,
-		error: propertiesError,
-	} = useProperties();
-	const {
-		clients: graphqlClients,
-		loading: clientsLoading,
-		error: clientsError,
-	} = useClients();
-
-	// Use GraphQL data if available, otherwise fall back to mock data
-	const properties =
-		graphqlProperties.length > 0 ? graphqlProperties : mockProperties;
-	const clients = graphqlClients.length > 0 ? graphqlClients : mockClients;
+	const { clients, properties, loading, dataSource } = useData();
 
 	const [selectedClientId, setSelectedClientId] = useState<string | undefined>(
 		undefined,
@@ -92,17 +77,8 @@ export default function Home() {
 		}
 	};
 
-	// Show data source indicator
-	const usingGraphQL =
-		graphqlProperties.length > 0 || graphqlClients.length > 0;
 	const dataSourceMessage =
-		propertiesError || clientsError
-			? 'Using mock data (API unavailable)'
-			: usingGraphQL
-			? 'Connected to GraphQL API'
-			: propertiesLoading || clientsLoading
-			? 'Loading from API...'
-			: 'Using mock data';
+		dataSource === 'live' ? 'Connected to live API' : 'Using mock data';
 
 	return (
 		<main className="container mx-auto max-w-7xl px-4 py-8">
@@ -124,7 +100,7 @@ export default function Home() {
 							clients={clients}
 							selectedClientId={selectedClientId}
 							onSelectClient={setSelectedClientId}
-							loading={clientsLoading && graphqlClients.length === 0}
+							loading={loading}
 						/>
 					</div>
 					<div className="space-y-2">
@@ -133,7 +109,7 @@ export default function Home() {
 							properties={properties}
 							selectedPropertyId={selectedPropertyId}
 							onSelectProperty={setSelectedPropertyId}
-							loading={propertiesLoading && graphqlProperties.length === 0}
+							loading={loading}
 						/>
 					</div>
 				</div>
