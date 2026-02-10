@@ -1,64 +1,58 @@
 import type { WeatherContext } from './graphState';
 
 /**
- * OpenWeatherMap API response types
+ * WeatherAPI.com response type
  */
-type OpenWeatherMapResponse = {
-	main: {
-		temp: number;
+type WeatherAPIResponse = {
+	current: {
+		temp_f: number;
+		condition: {
+			text: string;
+		};
 	};
-	weather: Array<{
-		main: string;
-		description: string;
-	}>;
 };
 
 /**
- * Fetches weather data for a given city and state using OpenWeatherMap API.
- *
- * @param city - The city name
- * @param state - The US state code (e.g., "TX", "CA")
- * @returns Weather context object with condition, temperature, and summary, or null on failure
+ * Fetches weather data using WeatherAPI.com
  */
 export async function fetchWeather(
 	city: string,
 	state: string,
 ): Promise<WeatherContext> {
-	const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+	const apiKey = process.env.WEATHERAPI_KEY;
 
 	if (!apiKey) {
-		console.warn('OPENWEATHERMAP_API_KEY not configured');
+		console.error('[Weather] WEATHERAPI_KEY not configured');
 		return null;
 	}
 
 	try {
-		// Build the query with city, state, and country code (US)
-		const query = encodeURIComponent(`${city},${state},US`);
-		const url = `https://api.openweathermap.org/data/2.5/weather?q=${query}&appid=${apiKey}&units=imperial`;
+		const query = encodeURIComponent(`${city}, ${state}`);
+		const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${query}&aqi=no`;
 
+		console.log(`[Weather] Fetching weather for ${city}, ${state}`);
 		const response = await fetch(url);
 
 		if (!response.ok) {
-			console.warn(
-				`Weather API returned ${response.status} for ${city}, ${state}`,
-			);
+			const errorBody = await response.text();
+			console.error(`[Weather] API error ${response.status}: ${errorBody}`);
 			return null;
 		}
 
-		const data: OpenWeatherMapResponse = await response.json();
+		const data: WeatherAPIResponse = await response.json();
 
-		// Extract weather information
-		const condition = data.weather[0]?.main || 'Unknown';
-		const description = data.weather[0]?.description || 'unknown conditions';
-		const temperature = Math.round(data.main.temp);
+		const temperature = Math.round(data.current.temp_f);
+		const condition = data.current.condition.text;
+
+		console.log(`[Weather] Success: ${temperature}°F, ${condition}`);
 
 		return {
 			condition,
 			temperature,
-			short_summary: `${temperature}°F with ${description}`,
+			short_summary: `${temperature}°F with ${condition.toLowerCase()}`,
 		};
 	} catch (error) {
-		console.warn(`Failed to fetch weather for ${city}, ${state}:`, error);
+		console.error(`[Weather] Failed to fetch:`, error);
 		return null;
 	}
 }

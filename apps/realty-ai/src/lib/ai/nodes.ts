@@ -5,9 +5,12 @@ import {
 	getRealtorPlaybookDocument,
 } from './documentLoaders';
 import { emailPromptTemplate } from './emailPrompt';
+import { validateEmail } from './emailValidator';
 import type { EmailGraphStateType } from './graphState';
 import { llm } from './llm';
 import { fetchWeather } from './weatherFetcher';
+
+const MAX_GENERATION_ATTEMPTS = 3;
 
 /**
  * Input normalization node: validates client/property and normalizes notes.
@@ -37,23 +40,26 @@ export async function inputNormalizationNode(
 
 /**
  * Weather fetch node: retrieves weather for the property location.
- * Handles failures gracefully by setting weather_context to null.
+ * Throws an error if weather cannot be fetched (weather is required).
  */
 export async function weatherFetchNode(
 	state: EmailGraphStateType,
 ): Promise<Partial<EmailGraphStateType>> {
 	const { property } = state;
 
-	// Property should be validated by inputNormalizationNode
 	if (!property) {
-		return { weather_context: null };
+		throw new Error('Property is required for weather fetch');
 	}
 
 	const weather = await fetchWeather(property.city, property.state);
 
-	return {
-		weather_context: weather,
-	};
+	if (!weather) {
+		throw new Error(
+			`Weather information is required but could not be fetched for ${property.city}, ${property.state}`,
+		);
+	}
+
+	return { weather_context: weather };
 }
 
 /**
@@ -155,6 +161,7 @@ function parseEmailResponse(response: string): GeneratedEmail {
 /**
  * Generation node: invokes the LLM to generate the email.
  * Parses the response to extract SUBJECT: and BODY: sections.
+ * Validates output with Zod schema and retries with feedback on failure.
  */
 export async function generationNode(
 	state: EmailGraphStateType,
@@ -165,38 +172,81 @@ export async function generationNode(
 		throw new Error('Final prompt is required for generation');
 	}
 
-	try {
-		// Invoke the LLM with the assembled prompt
-		const response = await llm.invoke(final_prompt);
+	let lastValidationErrors: string[] = [];
 
-		// Extract the text content from the response
-		const responseText =
-			typeof response.content === 'string'
-				? response.content
-				: Array.isArray(response.content)
-				? response.content
-						.filter((block) => typeof block === 'object' && 'text' in block)
-						.map((block) => (block as { text: string }).text)
-						.join('')
-				: '';
+	for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
+		try {
+			// Build prompt - include validation feedback on retry
+			let prompt = final_prompt;
+			if (attempt > 1 && lastValidationErrors.length > 0) {
+				const errorList = lastValidationErrors.map((e) => `- ${e}`).join('\n');
+				prompt =
+					`${final_prompt}\n\n` +
+					`IMPORTANT: Your previous attempt was rejected for these reasons:\n` +
+					`${errorList}\n\n` +
+					`Please regenerate the email addressing these issues.`;
+			}
 
-		// Parse the response to extract subject and body
-		const generatedEmail = parseEmailResponse(responseText);
+			// Invoke the LLM with the assembled prompt
+			const response = await llm.invoke(prompt);
 
-		return {
-			generated_email: generatedEmail,
-		};
-	} catch (error) {
-		console.error('Error generating email:', error);
+			// Extract the text content from the response
+			const responseText =
+				typeof response.content === 'string'
+					? response.content
+					: Array.isArray(response.content)
+					? response.content
+							.filter((block) => typeof block === 'object' && 'text' in block)
+							.map((block) => (block as { text: string }).text)
+							.join('')
+					: '';
 
-		// Return fallback email on error
-		return {
-			generated_email: {
-				subject: 'A Property You Might Love',
-				body: 'I found a property that might interest you. Please let me know if you would like more details.',
-			},
-		};
+			// Parse the response to extract subject and body
+			const generatedEmail = parseEmailResponse(responseText);
+
+			// Validate with Zod schema
+			const validation = validateEmail(generatedEmail);
+
+			if (validation.success) {
+				console.log(`[generationNode] Success on attempt ${attempt}`);
+				return { generated_email: validation.data };
+			}
+
+			// Validation failed - log and retry
+			lastValidationErrors = validation.errors;
+			console.warn(
+				`[generationNode] Attempt ${attempt} failed validation:`,
+				validation.errors,
+			);
+		} catch (error: unknown) {
+			const errName = error instanceof Error ? error.name : 'UnknownError';
+			const errMessage = error instanceof Error ? error.message : String(error);
+
+			console.error(
+				`[generationNode] LLM invocation failed (${errName}): ${errMessage}`,
+			);
+
+			// Surface auth/config errors so developers can diagnose quickly
+			if (
+				errName === 'AccessDeniedException' ||
+				errMessage.includes('Authentication failed')
+			) {
+				console.error(
+					'[generationNode] AWS Bedrock credentials are invalid or expired. ' +
+						'Update AI_AWS_BEDROCK_ACCESS_KEY_ID and AI_AWS_BEDROCK_SECRET_ACCESS_KEY in .env.local',
+				);
+			}
+
+			// Re-throw so the API route can return a proper error response
+			throw new Error(`LLM generation failed: ${errMessage}`);
+		}
 	}
+
+	// All attempts failed validation
+	throw new Error(
+		`Email generation failed validation after ${MAX_GENERATION_ATTEMPTS} attempts. ` +
+			`Last errors: ${lastValidationErrors.join(', ')}`,
+	);
 }
 
 /**

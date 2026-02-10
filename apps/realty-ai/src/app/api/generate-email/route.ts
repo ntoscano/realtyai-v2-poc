@@ -1,6 +1,7 @@
-import { mockClients } from '@/data/mockClients';
-import { mockProperties } from '@/data/mockProperties';
 import { emailGraph } from '@/lib/ai/emailGraph';
+// DATA SOURCE: Currently using MOCK lookups.
+// To switch to live backend, change to: import { findClientById, findPropertyById } from '@/lib/data/lookup.live';
+import { findClientById, findPropertyById } from '@/lib/data/lookup.live';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -9,8 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * Generates a personalized email for a realtor to send to a client about a property.
  *
  * Request body:
- * - clientId: string - The ID of the client
- * - propertyId: string - The ID of the property
+ * - clientId: string - The ID of the client (mock data ID or GraphQL UUID)
+ * - propertyId: string - The ID of the property (mock data ID or GraphQL UUID)
  * - notes?: string - Optional realtor notes to customize the email
  *
  * Response:
@@ -38,8 +39,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Look up client from mock data
-		const client = mockClients.find((c) => c.id === clientId);
+		const client = await findClientById(clientId);
 		if (!client) {
 			return NextResponse.json(
 				{ error: `Client not found with id: ${clientId}` },
@@ -47,8 +47,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Look up property from mock data
-		const property = mockProperties.find((p) => p.id === propertyId);
+		const property = await findPropertyById(propertyId);
 		if (!property) {
 			return NextResponse.json(
 				{ error: `Property not found with id: ${propertyId}` },
@@ -84,9 +83,10 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Handle other errors
+		// Surface actionable error details for LLM failures
+		const message = error instanceof Error ? error.message : 'Unknown error';
 		return NextResponse.json(
-			{ error: 'Internal server error while generating email' },
+			{ error: `Email generation failed: ${message}` },
 			{ status: 500 },
 		);
 	}

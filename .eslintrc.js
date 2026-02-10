@@ -1,5 +1,6 @@
 module.exports = {
 	root: true,
+	ignorePatterns: ['apps/realty-ai-api/**/*'],
 	extends: [
 		'eslint:recommended',
 		'plugin:react/recommended',

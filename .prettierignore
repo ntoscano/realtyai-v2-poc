@@ -1,6 +1,7 @@
 build
 dist
 storybook-static
+apps/realty-ai-api
 
 # debug
 npm-debug.log*
