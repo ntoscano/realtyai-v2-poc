@@ -5,6 +5,10 @@ import * as path from 'path';
 dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 
 import { DataSource } from 'typeorm';
+import {
+	BedrockRuntimeClient,
+	InvokeModelCommand,
+} from '@aws-sdk/client-bedrock-runtime';
 import { getTypeOrmConfig } from '../config/typeorm';
 import { Property, PropertyPayload } from '../modules/property/property.entity';
 import { Client, ClientPayload } from '../modules/client/client.entity';
@@ -481,6 +485,40 @@ function createSlug(text: string): string {
 		.trim();
 }
 
+/**
+ * Creates text representation for embedding from property payload.
+ */
+function createPropertyText(payload: PropertyPayload): string {
+	return `
+Address: ${payload.address}
+Location: ${payload.city}, ${payload.state}
+Property Type: ${payload.property_type}
+Price: $${payload.price.toLocaleString()}
+Size: ${payload.sqft.toLocaleString()} sqft
+Bedrooms: ${payload.beds}
+Bathrooms: ${payload.baths}
+Features: ${payload.highlights.join('. ')}
+Neighborhood: ${payload.neighborhood_description}
+    `.trim();
+}
+
+/**
+ * Get embedding from AWS Bedrock Titan
+ */
+async function getEmbedding(
+	bedrockClient: BedrockRuntimeClient,
+	text: string,
+): Promise<number[]> {
+	const response = await bedrockClient.send(
+		new InvokeModelCommand({
+			modelId: 'amazon.titan-embed-text-v2:0',
+			body: JSON.stringify({ inputText: text }),
+		}),
+	);
+	const result = JSON.parse(new TextDecoder().decode(response.body));
+	return result.embedding;
+}
+
 async function seed(): Promise<void> {
 	console.log('Starting database seed...\n');
 
@@ -552,6 +590,37 @@ async function seed(): Promise<void> {
 			console.log(`  ✓ ${client.name} (${client.email})`);
 		}
 		console.log(`✅ Seeded ${mockClients.length} clients\n`);
+
+		// Generate property embeddings
+		console.log('Generating property embeddings...');
+		console.log('DEBUG: AWS credentials check:', {
+			accessKeyId: process.env.AI_AWS_BEDROCK_ACCESS_KEY_ID?.substring(0, 8) + '...',
+			secretKeySet: !!process.env.AI_AWS_BEDROCK_SECRET_ACCESS_KEY,
+			region: process.env.AI_AWS_BEDROCK_REGION,
+		});
+		const bedrockClient = new BedrockRuntimeClient({
+			region: process.env.AI_AWS_BEDROCK_REGION || 'us-east-1',
+			credentials: {
+				accessKeyId: process.env.AI_AWS_BEDROCK_ACCESS_KEY_ID!,
+				secretAccessKey: process.env.AI_AWS_BEDROCK_SECRET_ACCESS_KEY!,
+			},
+		});
+
+		const allProperties = await propertyRepository.find();
+		for (const property of allProperties) {
+			try {
+				const text = createPropertyText(property.payload);
+				const embedding = await getEmbedding(bedrockClient, text);
+				await dataSource.query(
+					`UPDATE property SET embedding = $1 WHERE id = $2`,
+					[`[${embedding.join(',')}]`, property.id],
+				);
+				console.log(`  ✓ Embedding for ${property.name}`);
+			} catch (error) {
+				console.error(`  ✗ Failed embedding for ${property.name}:`, error);
+			}
+		}
+		console.log(`✅ Generated embeddings for all properties\n`);
 
 		console.log('🎉 Database seeding complete!');
 		console.log('');

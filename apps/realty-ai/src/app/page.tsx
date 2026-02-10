@@ -4,6 +4,7 @@ import { ClientSelector } from '@/components/ClientSelector';
 import { ContextInput } from '@/components/ContextInput';
 import { EmailPreview } from '@/components/EmailPreview';
 import { PropertySelector } from '@/components/PropertySelector';
+import { SimilarProperties } from '@/components/SimilarProperties';
 import { Button } from '@/components/ui/button';
 // DATA SOURCE: Currently using MOCK data.
 // To switch to live backend, change to: import { useLiveData as useData } from '@/lib/data/useLiveData';
@@ -113,6 +114,12 @@ export default function Home() {
 						/>
 					</div>
 				</div>
+
+				{/* Similar Properties Section */}
+				<SimilarProperties
+					selectedPropertyId={selectedPropertyId}
+					onSelectProperty={setSelectedPropertyId}
+				/>
 
 				<div className="space-y-2">
 					<h2 className="text-lg font-semibold">Additional Context</h2>

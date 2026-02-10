@@ -63,3 +63,20 @@ export const GET_CLIENT_BY_ID = gql`
 		}
 	}
 `;
+
+/**
+ * GraphQL query to fetch similar properties using vector similarity
+ */
+export const GET_SIMILAR_PROPERTIES = gql`
+	query GetSimilarProperties($propertyId: UUID!, $resultLimit: Int) {
+		similarProperties(propertyId: $propertyId, resultLimit: $resultLimit) {
+			nodes {
+				id
+				name
+				slug
+				payload
+				similarity
+			}
+		}
+	}
+`;

@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { postgraphileConfigFactory } from './config/graphile';
 import { getTypeOrmModuleConfig } from './config/typeorm';
+import { EmbeddingModule } from './modules/embedding/embedding.module';
 
 @Module({
 	imports: [
@@ -14,6 +15,7 @@ import { getTypeOrmModuleConfig } from './config/typeorm';
 			inject: [],
 			useFactory: postgraphileConfigFactory,
 		}),
+		EmbeddingModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],

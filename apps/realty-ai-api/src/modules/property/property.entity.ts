@@ -49,6 +49,10 @@ export class Property {
 	@Column({ type: 'jsonb', default: {} })
 	meta: PropertyMeta;
 
+	// Note: embedding column is managed via raw SQL (vector type not supported by TypeORM)
+	// 1024 dimensions for Amazon Titan Embed Text V2
+	// See migrations for the actual column definition
+
 	@CreateDateColumn({ name: 'created_at' })
 	createdAt: Date;
 
