@@ -12,7 +12,7 @@ The system follows a **LangGraph pipeline architecture** with **typed state mana
 2. **LangChain Documents** → Structure client/property data for prompt assembly
 3. **ChatPromptTemplate** → System/user message pair with variable interpolation
 4. **AWS Bedrock (Claude 3 Haiku)** → LLM generation via `@langchain/aws`
-5. **Regex Text Parsing** → Extracts SUBJECT/BODY from raw LLM output
+5. **Regex Text Parsing + Zod Validation** → Extracts SUBJECT/BODY, validates tone and content
 6. **Dual Data Sources** → GraphQL API with mock data fallback
 
 ---
@@ -273,15 +273,16 @@ export const llm = new ChatBedrockConverse({
 
 ```
 You are an experienced, successful real estate agent who excels at personalized
-client communication. Your emails are known for being warm, engaging, and highly
-effective at getting clients excited about properties.
+client communication. Your emails are professional, clear, and effective at
+presenting properties to clients.
 
 Key traits:
 - You always personalize based on what you know about the client
-- You match your tone to the client's communication style
+- You maintain a semi-professional, approachable tone
 - You highlight property features that align with the client's specific preferences
-- You're concise but compelling
+- You are concise and informative
 - You never use pushy sales tactics
+- You NEVER use emojis under any circumstances
 ```
 
 **User Message Template** (5 input variables):
@@ -298,17 +299,19 @@ PROPERTY INFORMATION:
 REALTOR GUIDELINES:
 {context}
 
-CURRENT WEATHER (use to add a personal touch if relevant):
+CURRENT WEATHER (REQUIRED - you must incorporate this into your email):
 {weather}
 
 ADDITIONAL NOTES FROM REALTOR (incorporate if provided):
 {notes}
 
 INSTRUCTIONS:
-1. Match your tone to the client's communication style:
-   - "formal": Professional language, complete sentences, proper structure
-   - "casual": Friendly, conversational tone, contractions okay
-   - "enthusiastic": High energy, excitement, exclamation points welcome
+1. Tone: Maintain a semi-professional, approachable style:
+   - Use clear, professional language
+   - Contractions are acceptable for readability
+   - Avoid overly casual or enthusiastic phrasing
+   - Use at most one exclamation point in the entire email
+   - NEVER use emojis
 
 2. Length: Keep the email under 300 words total
 
@@ -316,15 +319,19 @@ INSTRUCTIONS:
    - Personalized greeting using the client's first name
    - Opening that references something about their preferences
    - 2-3 short paragraphs highlighting property features that match their needs
-   - Optional weather tie-in if it adds value
+   - Include a natural weather tie-in that connects the weather to the property or viewing experience
    - Clear call to action with flexible options
    - Professional sign-off
 
 4. Output format (CRITICAL - follow this exactly):
+   Start your response with a subject line, then the body:
+
    SUBJECT: [Your compelling subject line here]
 
    BODY:
    [Your complete email body here]
+
+Remember: Be helpful and professional, not salesy. Keep the tone semi-professional - approachable but not casual or overly enthusiastic. Never use emojis.
 ```
 
 **Input Variables**:
@@ -389,36 +396,36 @@ Neighborhood: Family-friendly area with parks and coffee shops
 
 **File**: `apps/realty-ai/src/lib/ai/weatherFetcher.ts`
 
-**Purpose**: Fetch real-time weather for the property's location
+**Purpose**: Fetch real-time weather for the property's location using WeatherAPI.com
 
 ```typescript
 export async function fetchWeather(
 	city: string,
 	state: string,
 ): Promise<WeatherContext> {
-	const apiKey = process.env.OPENWEATHERMAP_API_KEY;
+	const apiKey = process.env.WEATHERAPI_KEY;
 	if (!apiKey) return null;
 
-	const query = encodeURIComponent(`${city},${state},US`);
-	const url = `https://api.openweathermap.org/data/2.5/weather?q=${query}&appid=${apiKey}&units=imperial`;
+	const query = encodeURIComponent(`${city}, ${state}`);
+	const url = `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${query}&aqi=no`;
 
 	const response = await fetch(url);
-	const data: OpenWeatherMapResponse = await response.json();
+	const data: WeatherAPIResponse = await response.json();
 
 	return {
-		condition: data.weather[0]?.main || 'Unknown',
-		temperature: Math.round(data.main.temp),
-		short_summary: `${temperature}°F with ${description}`,
+		condition: data.current.condition.text,
+		temperature: Math.round(data.current.temp_f),
+		short_summary: `${temperature}°F with ${condition.toLowerCase()}`,
 	};
 }
 ```
 
 **Behavior**:
 
-- Returns `null` if `OPENWEATHERMAP_API_KEY` is not set (graceful skip)
+- Returns `null` if `WEATHERAPI_KEY` is not set (graceful skip)
 - Returns `null` on any API error (non-blocking failure)
-- Uses imperial units (Fahrenheit)
-- Queries OpenWeatherMap with `city,state,US` format
+- Uses Fahrenheit via `data.current.temp_f`
+- Queries WeatherAPI.com with `city, state` format
 
 ---
 
@@ -462,7 +469,16 @@ Each node receives the full state and returns `Partial<EmailGraphStateType>` (on
   const subjectMatch = response.match(/SUBJECT:\s*(.+?)(?=\n|BODY:|$)/i);
   const bodyMatch = response.match(/BODY:\s*([\s\S]+?)$/i);
   ```
-- **Falls back** to generic email if parsing fails or LLM errors
+- **Validates** parsed email with Zod schema via `validateEmail()`:
+  - Subject must be non-empty and contain no emojis
+  - Body must be at least 50 characters and contain no emojis
+  - Body must not have excessive enthusiasm (multiple `!!`, words like "amazing", "incredible", etc.)
+  - Body must include temperature in °F format (weather information)
+- **Retries** up to 3 times on validation failure, appending error feedback to the prompt:
+  ```typescript
+  prompt = `${final_prompt}\n\nIMPORTANT: Your previous attempt was rejected for these reasons:\n${errorList}\n\nPlease regenerate the email addressing these issues.`;
+  ```
+- **Throws** error if all attempts fail validation (no fallback to preserve quality)
 
 #### Node 6: `postProcessingNode`
 
@@ -526,21 +542,39 @@ const clientDocument = createClientDocument(client);
 
 ---
 
-### 4. Text-Based Output Parsing
+### 4. Text-Based Output Parsing + Zod Validation
 
-**Pattern**: LLM outputs free text with `SUBJECT:` and `BODY:` markers, parsed via regex
+**Pattern**: LLM outputs free text with `SUBJECT:` and `BODY:` markers, parsed via regex, then validated via Zod
 
 ```typescript
+// Step 1: Regex parsing
 const subjectMatch = response.match(/SUBJECT:\s*(.+?)(?=\n|BODY:|$)/i);
 const bodyMatch = response.match(/BODY:\s*([\s\S]+?)$/i);
+
+// Step 2: Zod validation (in emailValidator.ts)
+const validation = validateEmail(generatedEmail);
+if (!validation.success) {
+	// Retry with feedback to LLM
+}
 ```
+
+**Zod Schema** (`emailValidator.ts`):
+
+- `subject`: Required, non-empty, no emojis
+- `body`: Minimum 50 characters, no emojis, limited enthusiasm (max 1 exclamation pattern like `!!` or superlatives), must contain `°F` (weather temperature)
+
+**Retry Mechanism**:
+
+- On validation failure, the `generationNode` appends error messages to the prompt and retries
+- Up to 3 total attempts before throwing an error
+- This ensures consistent semi-professional tone without emojis
 
 **Trade-offs**:
 
-- Simple implementation, no schema library dependency
-- Fragile if LLM doesn't follow format (mitigated by fallback)
-- No type validation on output content
-- Could be replaced with structured output (Zod + `withStructuredOutput()`) for robustness
+- Regex parsing is still fragile if LLM doesn't follow format
+- Zod validation enforces content quality (tone, no emojis) at runtime
+- Retry loop adds latency but improves output quality
+- Could be enhanced with `withStructuredOutput()` for format guarantees
 
 ---
 
@@ -648,8 +682,9 @@ apps/realty-ai/src/
 │   │   ├── nodes.ts                 # 6 node implementations
 │   │   ├── llm.ts                   # ChatBedrockConverse configuration
 │   │   ├── emailPrompt.ts           # ChatPromptTemplate (system + user messages)
+│   │   ├── emailValidator.ts        # Zod schema for email validation + retry logic
 │   │   ├── documentLoaders.ts       # Client, Property, Playbook document creators
-│   │   └── weatherFetcher.ts        # OpenWeatherMap API integration
+│   │   └── weatherFetcher.ts        # WeatherAPI.com integration
 │   ├── graphql/
 │   │   ├── client.ts                # Apollo Client configuration
 │   │   ├── queries.ts               # GraphQL query definitions
@@ -683,7 +718,7 @@ AI_AWS_BEDROCK_SECRET_ACCESS_KEY=***
 AI_AWS_BEDROCK_REGION=us-west-2
 
 # Weather API (Optional - degrades gracefully)
-OPENWEATHERMAP_API_KEY=***
+WEATHERAPI_KEY=***
 
 # GraphQL API (Optional - falls back to mock data)
 NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3001/graphql
@@ -698,7 +733,8 @@ NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3001/graphql
 	"@langchain/aws": "^1.2.1",
 	"@aws-sdk/client-bedrock-runtime": "^3.975.0",
 	"@apollo/client": "^3.x",
-	"graphql": "^16.x"
+	"graphql": "^16.x",
+	"zod": "^3.24.1"
 }
 ```
 
@@ -855,9 +891,17 @@ The `contextRetrievalNode` currently returns a static playbook document. This is
 
 The current implementation waits for the full LLM response before returning. Adding streaming would improve UX by showing the email as it generates. LangGraph supports streaming via `.stream()` instead of `.invoke()`.
 
-### Structured Output Validation
+### Structured Output Validation (Partially Implemented)
 
-Replace regex parsing with LangChain's `.withStructuredOutput()` and a Zod schema:
+**Current State**: Zod validation is now implemented in `emailValidator.ts` to enforce content quality:
+
+- No emojis in subject or body
+- Semi-professional tone (limited enthusiasm markers)
+- Minimum body length
+
+The `generationNode` uses a retry loop (up to 3 attempts) with feedback when validation fails.
+
+**Future Enhancement**: Replace regex parsing with LangChain's `.withStructuredOutput()`:
 
 ```typescript
 const structuredLlm = llm.withStructuredOutput(
@@ -868,7 +912,7 @@ const structuredLlm = llm.withStructuredOutput(
 );
 ```
 
-This would eliminate the need for `parseEmailResponse()` and provide guaranteed output structure.
+This would eliminate the need for `parseEmailResponse()` regex parsing and provide guaranteed output structure, while keeping the existing Zod validation for content quality enforcement.
 
 ### Modular Prompt Files
 
