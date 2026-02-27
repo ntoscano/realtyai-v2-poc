@@ -1,6 +1,6 @@
 module.exports = {
 	root: true,
-	ignorePatterns: ['apps/realty-ai-api/**/*'],
+	ignorePatterns: ['apps/realty-ai-api/**/*', 'apps/tictactoe-api/**/*'],
 	extends: [
 		'eslint:recommended',
 		'plugin:react/recommended',

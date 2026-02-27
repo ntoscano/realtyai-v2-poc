@@ -2,6 +2,7 @@ build
 dist
 storybook-static
 apps/realty-ai-api
+apps/tictactoe-api
 
 # debug
 npm-debug.log*
