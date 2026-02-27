@@ -199,3 +199,15 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - GameStatus uses a Record<GameStatusType, {text, className}> mapping for clean status-to-message lookup
   - No browser testing tools available - manual browser verification needed
 ---
+
+## 2026-02-26 - US-014
+- What was implemented: Game history sidebar components - GameHistoryItem and GameHistorySidebar
+- Files changed:
+  - apps/tictactoe/src/components/GameHistoryItem.tsx (displays date/time with short format, move count, result Badge with Win/Loss/Draw variants)
+  - apps/tictactoe/src/components/GameHistorySidebar.tsx (Card with Game History header, ScrollArea at h-[400px], loading/empty states)
+- **Learnings for future iterations:**
+  - GameHistorySidebar takes `games` and `loading` as props from the parent (not using the hook directly) - keeps it a presentational component
+  - Badge variants map: x_wins=default (green), o_wins=destructive (red), draw=secondary (gray)
+  - Date formatting uses toLocaleDateString with month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  - No browser testing tools available - manual browser verification needed
+---

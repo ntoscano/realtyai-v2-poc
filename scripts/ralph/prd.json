@@ -236,7 +236,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 14,
-			"passes": false,
+			"passes": true,
 			"notes": "Import Card, CardHeader, CardTitle, CardContent from components/ui/card. Import Badge from components/ui/badge. Import ScrollArea from components/ui/scroll-area. Date formatting: toLocaleDateString with month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'."
 		},
 		{
