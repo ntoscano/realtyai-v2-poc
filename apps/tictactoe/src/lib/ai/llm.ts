@@ -17,5 +17,5 @@ export const llm = new ChatBedrockConverse({
 		secretAccessKey: process.env.AI_AWS_BEDROCK_SECRET_ACCESS_KEY || '',
 	},
 	temperature: 0.7,
-	maxTokens: 256,
+	maxTokens: 2048, // DeepSeek-R1 needs room for chain-of-thought reasoning before answering
 });

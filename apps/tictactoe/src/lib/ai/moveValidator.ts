@@ -34,6 +34,29 @@ export function parseMoveResponse(response: string): number | null {
 	return parseInt(match[0], 10);
 }
 
+/**
+ * Attempts to extract a valid move from DeepSeek-R1 reasoning text.
+ * Looks for common patterns like "I'll choose position X" or "my move is X"
+ * at the end of the reasoning chain, preferring the last mentioned valid position.
+ */
+export function parseMoveFromReasoning(
+	reasoningText: string,
+	availablePositions: number[],
+): number | null {
+	// Look for the last digit 0-8 mentioned in the reasoning that's a valid position
+	const digits = Array.from(reasoningText.matchAll(/\b([0-8])\b/g));
+	if (digits.length === 0) return null;
+
+	// Work backwards — the model's final conclusion is usually near the end
+	for (let i = digits.length - 1; i >= 0; i--) {
+		const pos = parseInt(digits[i][1], 10);
+		if (availablePositions.includes(pos)) {
+			return pos;
+		}
+	}
+	return null;
+}
+
 export type MoveValidationResult =
 	| { success: true; position: number }
 	| { success: false; errors: string[] };

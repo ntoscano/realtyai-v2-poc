@@ -7,7 +7,11 @@ import {
 import type { MoveGraphStateType } from './graphState';
 import { llm } from './llm';
 import { movePromptTemplate } from './movePrompt';
-import { parseMoveResponse, validateMove } from './moveValidator';
+import {
+	parseMoveFromReasoning,
+	parseMoveResponse,
+	validateMove,
+} from './moveValidator';
 
 const MAX_GENERATION_ATTEMPTS = 3;
 
@@ -72,18 +76,40 @@ export async function moveGenerationNode(
 			const response = await llm.invoke(formattedPrompt);
 
 			// Extract text content from response
-			const responseText =
-				typeof response.content === 'string'
-					? response.content
-					: Array.isArray(response.content)
-					? response.content
-							.filter((block) => typeof block === 'object' && 'text' in block)
-							.map((block) => (block as { text: string }).text)
-							.join('')
-					: '';
+			// DeepSeek-R1 via Bedrock returns reasoning_content blocks and text blocks
+			let responseText = '';
+			let reasoningText = '';
 
-			// Parse the response to extract a move position
-			const position = parseMoveResponse(responseText);
+			if (typeof response.content === 'string') {
+				responseText = response.content;
+			} else if (Array.isArray(response.content)) {
+				for (const block of response.content) {
+					if (typeof block === 'object' && block !== null) {
+						if ('text' in block) {
+							responseText += (block as { text: string }).text;
+						}
+						if (
+							'reasoningText' in block &&
+							typeof (block as Record<string, unknown>).reasoningText ===
+								'object'
+						) {
+							const rt = (
+								block as unknown as { reasoningText: { text: string } }
+							).reasoningText;
+							if (rt && 'text' in rt) {
+								reasoningText += rt.text;
+							}
+						}
+					}
+				}
+			}
+
+			// Parse the response — try the main text first, fall back to reasoning text
+			// DeepSeek-R1 may put its answer at the end of reasoning if maxTokens runs short
+			let position = parseMoveResponse(responseText);
+			if (position === null && reasoningText) {
+				position = parseMoveFromReasoning(reasoningText, available_positions);
+			}
 
 			if (position === null) {
 				lastErrors = [
