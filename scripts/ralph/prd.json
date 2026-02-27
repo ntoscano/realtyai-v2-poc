@@ -123,7 +123,7 @@
 				"Typecheck passes"
 			],
 			"priority": 7,
-			"passes": false,
+			"passes": true,
 			"notes": "Copy .env.local Bedrock credentials from realty-ai/.env.local. Dependencies needed: @langchain/aws, @langchain/core, @langchain/langgraph, @apollo/client, graphql, zod, tailwindcss, class-variance-authority, clsx, tailwind-merge, lucide-react, @radix-ui/react-scroll-area, @radix-ui/react-slot."
 		},
 		{
@@ -139,7 +139,7 @@
 				"Typecheck passes"
 			],
 			"priority": 8,
-			"passes": false,
+			"passes": true,
 			"notes": "These are self-contained shadcn/ui components with no project-specific logic. Direct copy from realty-ai."
 		},
 		{
