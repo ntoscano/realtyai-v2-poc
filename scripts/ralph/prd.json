@@ -68,7 +68,7 @@
 				"Typecheck passes"
 			],
 			"priority": 4,
-			"passes": false,
+			"passes": true,
 			"notes": "Use dotenv.config() with path.join(__dirname, '../.env.local') in main.ts. PostGraphileModule uses postgraphile-nest package with forRootAsync() and factory function from graphile.ts."
 		},
 		{
@@ -87,7 +87,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": false,
+			"passes": true,
 			"notes": "uuid-ossp extension needs superuser privileges. TypeORM migration:generate requires -d src/config/typeorm.ts flag. Seed script needs dotenv loading and --project tsconfig.json flag."
 		},
 		{

@@ -48,3 +48,27 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - SnakeNamingStrategy auto-converts camelCase property names to snake_case column names, but explicit `name` in @Column/@CreateDateColumn is still best practice for clarity
   - Game module directory was pre-created in US-001 scaffolding as empty dir
 ---
+
+## 2026-02-26 - US-004
+- What was implemented: NestJS application bootstrap (app.service, app.controller, app.module, main.ts)
+- Files changed:
+  - apps/tictactoe-api/src/app.service.ts (getRoot returns {message: 'TicTacToe API'}, getHealth returns {status: 'ok'})
+  - apps/tictactoe-api/src/app.controller.ts (GET / and GET /health endpoints)
+  - apps/tictactoe-api/src/app.module.ts (TypeOrmModule.forRoot + PostGraphileModule.forRootAsync)
+  - apps/tictactoe-api/src/main.ts (bootstrap on port 3002 with dotenv from .env.local)
+- **Learnings for future iterations:**
+  - Files were already committed in prior iteration but PRD wasn't updated - always update PRD after commit
+  - main.ts dotenv path uses `path.join(__dirname, '../.env.local')` (relative to dist/ at runtime)
+  - PostGraphileModule.forRootAsync uses empty imports/inject arrays with postgraphileConfigFactory
+---
+
+## 2026-02-26 - US-005
+- What was implemented: Database migration and seed data (retroactively marking as passed - was committed prior)
+- Files changed:
+  - apps/tictactoe-api/src/migrations/1772154510409-CreateGame.ts (TypeORM migration for game table)
+  - apps/tictactoe-api/src/cli/seed.ts (inserts 2 sample games)
+  - apps/tictactoe-api/src/cli/migration.ts (cleanup utility placeholder)
+- **Learnings for future iterations:**
+  - Migration filename includes timestamp prefix for ordering
+  - Seed script and migration were committed together in same story
+---
