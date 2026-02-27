@@ -185,3 +185,17 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - GraphQLGameNode type maps PostGraphile's camelCase fields (boardState, createdAt) to frontend types
   - transformGameToSummary handles null winner and missing moves array gracefully with nullish coalescing
 ---
+
+## 2026-02-26 - US-013
+- What was implemented: Game board UI components - Cell, GameBoard, GameStatus, and NewGameButton
+- Files changed:
+  - apps/tictactoe/src/components/Cell.tsx (clickable 96x96px button showing X/O/empty, hover state, disabled logic)
+  - apps/tictactoe/src/components/GameBoard.tsx (3x3 CSS grid of Cell components with onCellClick callback)
+  - apps/tictactoe/src/components/GameStatus.tsx (contextual messages with status-specific colors and animate-pulse for AI thinking)
+  - apps/tictactoe/src/components/NewGameButton.tsx (outline Button that triggers onClick to reset game)
+- **Learnings for future iterations:**
+  - Cell uses h-24 w-24 for 96px sizing (Tailwind's h-24/w-24 = 6rem = 96px)
+  - GameBoard disables all cells via a single `disabled` prop - game-over and AI-thinking states are handled by the parent
+  - GameStatus uses a Record<GameStatusType, {text, className}> mapping for clean status-to-message lookup
+  - No browser testing tools available - manual browser verification needed
+---
