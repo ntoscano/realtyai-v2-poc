@@ -1,0 +1,261 @@
+# Ralph Progress Log
+Started: Sat Jan 24 19:14:00 PST 2026
+---
+
+## Codebase Patterns
+- NestJS apps in this monorepo need separate eslint/prettier configs because the root config uses @trivago/prettier-plugin-sort-imports which doesn't support decorators
+- Add apps/realty-ai-api to .prettierignore and .eslintrc.js ignorePatterns to avoid decorator parsing errors
+- Use `root: true` in app-level .eslintrc.js to prevent inheritance from root config
+- NestJS CLI requires tsconfig.build.json in the app directory
+- Use dotenv.config() with explicit path for .env.local loading (dotenv/config only loads .env)
+- TypeORM CLI scripts need `--project tsconfig.json` flag for ts-node to pick up decorator support
+- uuid-ossp extension must be created by superuser (postgres) before running migrations that use uuid_generate_v4()
+- PostGraphile uses postgraphile-nest for NestJS integration; use PostGraphileModule.forRootAsync() with factory function
+- PostGraphile auto-generates GraphQL API from database; queries use connection pattern: allItems { nodes { ... } }
+- Apollo Client uses typed generics: apolloClient.query<ResponseType>({ query }) for proper TypeScript inference
+- GraphQL data from PostGraphile stores entity data in `payload` JSONB column; transform functions needed to map to frontend types
+
+---
+
+## 2026-01-24 19:21:00 - US-001
+- What was implemented:
+  - Created apps/realty-ai-api/package.json with NestJS 8.x dependencies
+  - Created npm scripts: dev, build, start, typeorm:migration:new, typeorm:migration:run, migration, seed
+  - Created tsconfig.json with decorator support and @/* path alias
+  - Created nest-cli.json
+  - Created .env.example and .env.local with database credentials
+  - Created minimal src/main.ts and src/app.module.ts for typecheck verification
+  - Created app-level .eslintrc.js for NestJS decorator support
+- Files changed:
+  - apps/realty-ai-api/package.json (new)
+  - apps/realty-ai-api/tsconfig.json (new)
+  - apps/realty-ai-api/nest-cli.json (new)
+  - apps/realty-ai-api/.env.example (new)
+  - apps/realty-ai-api/.env.local (new)
+  - apps/realty-ai-api/.eslintrc.js (new)
+  - apps/realty-ai-api/src/main.ts (new)
+  - apps/realty-ai-api/src/app.module.ts (new)
+  - .eslintrc.js (modified - added ignorePatterns for api app)
+  - .prettierignore (modified - added api app)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - Root eslint/prettier configs in this monorepo don't support TypeScript decorators
+  - Must add NestJS apps to .prettierignore and eslintrc ignorePatterns
+  - App needs its own .eslintrc.js with `root: true` and parserOptions.project pointing to local tsconfig
+  - Database credentials: host=localhost, port=54320, user=dtxs1, password=password, db=realty-ai
+---
+
+## 2026-01-24 20:45:00 - US-002
+- What was implemented:
+  - Created apps/realty-ai-api/docker-compose.yml with postgres:16-alpine image
+  - PostgreSQL configured on port 54320 with postgres/docker credentials
+  - Added realty_ai_pgdata volume for data persistence
+  - Added docker:up and docker:down scripts to package.json
+- Files changed:
+  - apps/realty-ai-api/docker-compose.yml (new)
+  - apps/realty-ai-api/package.json (modified - added docker scripts)
+- **Learnings for future iterations:**
+  - There's already a shared PostgreSQL container `pg` running on port 54320
+  - The existing container uses different credentials (dtxs1/password) than the docker-compose (postgres/docker)
+  - The .env.local references dtxs1 credentials which work with the existing shared container
+  - docker-compose.yml was created per PRD spec but would conflict if run alongside existing pg container
+---
+
+## 2026-01-24 21:15:00 - US-003
+- What was implemented:
+  - Created src/config/postgres.ts with getConfig(), getAdminConfig(), getClient() functions
+  - Created src/config/typeorm.ts with TypeORM DataSourceOptions using SnakeNamingStrategy
+  - Created src/config/roles.ts with DbRoles enum (Author, Anon, Super)
+  - Created src/config/nest.ts with NestJS application options
+  - Added @types/pg devDependency for TypeScript support
+- Files changed:
+  - apps/realty-ai-api/src/config/postgres.ts (new)
+  - apps/realty-ai-api/src/config/typeorm.ts (new)
+  - apps/realty-ai-api/src/config/roles.ts (new)
+  - apps/realty-ai-api/src/config/nest.ts (new)
+  - apps/realty-ai-api/package.json (modified - added @types/pg)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - TypeORM 0.3.x uses DataSource and DataSourceOptions instead of Connection/ConnectionOptions
+  - The typeorm.ts exports a default DataSource for CLI usage (migrations) and getTypeOrmModuleConfig() for NestJS module
+  - Need @types/pg for pg Client type definitions
+  - postgres.ts provides low-level pg Client access, useful for raw SQL operations
+---
+
+## 2026-01-24 19:32:00 - US-004
+- What was implemented:
+  - Added dotenv dependency for environment variable loading
+  - Updated src/main.ts to load .env.local file at startup
+  - Created src/cli/test-connection.ts script to verify database connectivity
+  - Added typecheck and test:db scripts to package.json
+  - Created tsconfig.build.json required by NestJS CLI
+- Files changed:
+  - apps/realty-ai-api/package.json (modified - added dotenv, typecheck, test:db scripts)
+  - apps/realty-ai-api/src/main.ts (modified - added dotenv loading)
+  - apps/realty-ai-api/src/cli/test-connection.ts (new)
+  - apps/realty-ai-api/tsconfig.build.json (new)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - NestJS CLI requires tsconfig.build.json to run `nest start --watch`
+  - dotenv/config only loads .env, not .env.local - need to use dotenv.config() with explicit path
+  - For CLI scripts, use path.join(__dirname, '../../.env.local') from src/cli/
+  - For main.ts, use path.join(__dirname, '../.env.local') since it's in src/
+  - pnpm test:db can be used to verify database connectivity before running the full API
+---
+
+## 2026-01-24 21:45:00 - US-005
+- What was implemented:
+  - Created src/modules/property/property.entity.ts with TypeORM entity
+  - Entity has columns: id (uuid PK), type (varchar), name (varchar), slug (varchar nullable), payload (jsonb), meta (jsonb), createdAt, updatedAt
+  - Created PropertyPayload interface with: address, city, state, price, beds, baths, sqft, property_type, highlights[], neighborhood_description
+  - Created PropertyMeta interface for flexible metadata storage
+  - Entity uses @Entity('property') decorator
+- Files changed:
+  - apps/realty-ai-api/src/modules/property/property.entity.ts (new)
+- **Learnings for future iterations:**
+  - TypeORM entity uses @CreateDateColumn and @UpdateDateColumn for automatic timestamp management
+  - JSONB columns should have explicit interface types for TypeScript type safety
+  - Use `name: 'created_at'` in decorator to set snake_case column names (SnakeNamingStrategy handles this but explicit is clearer)
+  - Entity pattern: id (uuid), type, name, slug, payload (JSONB), meta (JSONB), timestamps
+---
+
+## 2026-01-24 22:00:00 - US-006
+- What was implemented:
+  - Created src/modules/client/client.entity.ts with TypeORM entity
+  - Entity has columns: id (uuid PK), type (varchar), name (varchar), email (varchar indexed), slug (varchar nullable), payload (jsonb), meta (jsonb), createdAt, updatedAt
+  - Created ClientPayload interface with: buying_stage, preferences[], budget_range, lifestyle_notes, communication_style
+  - Created ClientMeta interface for flexible metadata storage
+  - Entity uses @Entity('client') decorator
+  - Added @Index() decorator on email column for lookup performance
+- Files changed:
+  - apps/realty-ai-api/src/modules/client/client.entity.ts (new)
+- **Learnings for future iterations:**
+  - Client entity follows same pattern as Property entity: id, type, name, slug, payload, meta, timestamps
+  - Use @Index() decorator from TypeORM for column indexes (email for client lookups)
+  - Entity pattern is consistent across modules - copy Property structure and adapt payload interface
+---
+
+## 2026-01-24 22:15:00 - US-007
+- What was implemented:
+  - Created src/config/entities.ts exporting entities array with Property and Client entities
+  - Updated src/config/typeorm.ts to import entities from entities.ts instead of using glob patterns
+  - Both getTypeOrmConfig() and getTypeOrmModuleConfig() now use the centralized entity registry
+- Files changed:
+  - apps/realty-ai-api/src/config/entities.ts (new)
+  - apps/realty-ai-api/src/config/typeorm.ts (modified - imports entities from entities.ts)
+- **Learnings for future iterations:**
+  - Using explicit entity imports vs glob patterns provides better TypeScript type safety
+  - Centralized entity registry in config/entities.ts makes it easy to see all registered entities
+  - When adding new entities, register them in entities.ts rather than relying on glob patterns
+---
+
+## 2026-01-24 22:45:00 - US-008
+- What was implemented:
+  - Generated InitialSchema migration using pnpm typeorm:migration:new
+  - Migration creates property table with columns: id, type, name, slug, payload, meta, created_at, updated_at
+  - Migration creates client table with columns: id, type, name, email, slug, payload, meta, created_at, updated_at
+  - Migration creates IDX_6436cc6b79593760b9ef921ef1 index on client.email
+  - Created src/cli/migration.ts as placeholder for cleanup utility
+  - Updated typeorm.ts to load dotenv for CLI operations
+  - Fixed package.json scripts to use --project tsconfig.json for ts-node decorator support
+  - Created uuid-ossp extension via docker exec as superuser
+  - Successfully ran pnpm typeorm:migration:run
+- Files changed:
+  - apps/realty-ai-api/src/migrations/1769314817078-InitialSchema.ts (new)
+  - apps/realty-ai-api/src/cli/migration.ts (new)
+  - apps/realty-ai-api/src/config/typeorm.ts (modified - added dotenv loading)
+  - apps/realty-ai-api/package.json (modified - fixed typeorm scripts)
+- **Learnings for future iterations:**
+  - TypeORM CLI commands require `--project tsconfig.json` flag to properly load decorators
+  - uuid-ossp extension needs superuser privileges; run: `docker exec pg psql -U postgres -d realty-ai -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'`
+  - TypeORM 0.3.x migration:generate requires `-d src/config/typeorm.ts` to specify data source
+  - The dtxs1 user doesn't have superuser privileges - must create extensions separately
+  - Migration generated is already clean; minimal cleanup needed for simple table creation
+---
+
+## 2026-01-24 20:25:00 - US-009
+- What was implemented:
+  - Created src/app.service.ts with health check and root endpoint methods
+  - Created src/app.controller.ts with GET / and GET /health endpoints
+  - Updated src/app.module.ts to import TypeOrmModule with getTypeOrmModuleConfig()
+  - Registered AppController and AppService in the module
+  - src/main.ts already existed and bootstraps on port 3001
+- Files changed:
+  - apps/realty-ai-api/src/app.service.ts (new)
+  - apps/realty-ai-api/src/app.controller.ts (new)
+  - apps/realty-ai-api/src/app.module.ts (modified - added TypeOrmModule, controller, service)
+- **Learnings for future iterations:**
+  - NestJS bootstrap uses TypeOrmModule.forRoot() with config from getTypeOrmModuleConfig()
+  - Health endpoint returns simple {status: 'ok'} for load balancer checks
+  - AppService should be @Injectable() and injected into AppController constructor
+  - pnpm dev starts the server in watch mode; server runs on port 3001
+---
+
+## 2026-01-24 20:30:00 - US-010
+- What was implemented:
+  - Installed postgraphile@^4.7.0 and postgraphile-nest@^1.0.5 packages
+  - Created src/config/graphile.ts with PostGraphile configuration factory
+  - Registered PostGraphileModule.forRootAsync() in app.module.ts
+  - GraphiQL playground available at http://localhost:3001/graphiql
+  - GraphQL endpoint available at http://localhost:3001/graphql
+  - Verified allProperties and allClients queries work correctly
+- Files changed:
+  - apps/realty-ai-api/package.json (modified - added postgraphile dependencies)
+  - apps/realty-ai-api/src/config/graphile.ts (new)
+  - apps/realty-ai-api/src/app.module.ts (modified - added PostGraphileModule)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - PostGraphile auto-generates full CRUD GraphQL API from PostgreSQL tables
+  - Use postgraphile-nest package for NestJS integration with PostGraphileModule.forRootAsync()
+  - graphile.ts config uses getConfig() from postgres.ts for database connection
+  - GRAPHIQL_ENABLED env var controls whether GraphiQL playground is available
+  - Non-superuser warning about watch fixtures is not critical - just means no live schema reloading
+  - PostGraphile uses connection-based pagination (allProperties { nodes { ... } })
+---
+
+## 2026-01-24 - US-011
+- What was implemented:
+  - Created src/cli/seed.ts CLI script for seeding database with mock data
+  - Script inserts 15 properties from mockProperties.ts data
+  - Script inserts 15 clients from mockClients.ts data
+  - Property payload contains: address, city, state, price, beds, baths, sqft, property_type, highlights, neighborhood_description
+  - Client payload contains: buying_stage, preferences, budget_range, lifestyle_notes, communication_style
+  - Added --project tsconfig.json flag to seed script for decorator support
+- Files changed:
+  - apps/realty-ai-api/src/cli/seed.ts (new)
+  - apps/realty-ai-api/package.json (modified - updated seed script)
+- **Learnings for future iterations:**
+  - TypeORM 0.3.x requires createQueryBuilder().delete().execute() for deleting all records (empty criteria not allowed with delete({}))
+  - Seed script maps flat mock data to entity pattern: entity columns (type, name, slug) + payload (JSONB) + meta (JSONB)
+  - Store original mock ID in meta.originalId for traceability
+  - createSlug() helper normalizes names to URL-friendly slugs
+---
+
+## 2026-01-24 - US-012
+- What was implemented:
+  - Installed @apollo/client and graphql dependencies in apps/realty-ai
+  - Created src/lib/graphql/client.ts with Apollo Client configuration
+  - Added NEXT_PUBLIC_GRAPHQL_URL environment variable to .env.example and .env.local
+  - Created src/lib/graphql/queries.ts with GET_ALL_PROPERTIES, GET_ALL_CLIENTS, GET_PROPERTY_BY_ID, GET_CLIENT_BY_ID queries
+  - Created src/lib/graphql/hooks.ts with useProperties() and useClients() hooks that transform GraphQL data to frontend types
+  - Updated PropertySelector and ClientSelector components to accept data as props with loading state
+  - Updated page.tsx to use GraphQL hooks with fallback to mock data if API unavailable
+  - Updated API route to support both mock data IDs and GraphQL UUIDs for email generation
+- Files changed:
+  - apps/realty-ai/package.json (modified - added @apollo/client, graphql)
+  - apps/realty-ai/.env.example (modified - added NEXT_PUBLIC_GRAPHQL_URL)
+  - apps/realty-ai/src/lib/graphql/client.ts (new)
+  - apps/realty-ai/src/lib/graphql/queries.ts (new)
+  - apps/realty-ai/src/lib/graphql/hooks.ts (new)
+  - apps/realty-ai/src/components/PropertySelector.tsx (modified - accepts properties prop)
+  - apps/realty-ai/src/components/ClientSelector.tsx (modified - accepts clients prop)
+  - apps/realty-ai/src/app/page.tsx (modified - uses GraphQL hooks)
+  - apps/realty-ai/src/app/api/generate-email/route.ts (modified - supports UUID lookups)
+  - pnpm-lock.yaml (modified)
+- **Learnings for future iterations:**
+  - Apollo Client query() returns { data } which may be undefined; use optional chaining: result.data?.allProperties?.nodes
+  - PostGraphile stores entity-specific data in `payload` JSONB column; need transform functions to flatten to frontend types
+  - Frontend gracefully falls back to mock data when GraphQL API is unavailable
+  - API route checks for UUID format to determine whether to lookup in mock data or GraphQL
+  - Use typed generics with Apollo: apolloClient.query<ResponseType>({ query }) for TypeScript safety
+---
