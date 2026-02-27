@@ -1,20 +1,50 @@
 # Ralph Progress Log
-Started: Wed Feb 26 2026
----
+Started: Thu Feb 26 16:55:08 PST 2026
 
 ## Codebase Patterns
-- NestJS apps in this monorepo need separate eslint/prettier configs because the root config uses @trivago/prettier-plugin-sort-imports which doesn't support decorators
-- Add NestJS apps to .prettierignore and .eslintrc.js ignorePatterns to avoid decorator parsing errors
-- Use `root: true` in app-level .eslintrc.js to prevent inheritance from root config
-- NestJS CLI requires tsconfig.build.json in the app directory
-- Use dotenv.config() with explicit path for .env.local loading (dotenv/config only loads .env)
-- TypeORM CLI scripts need `--project tsconfig.json` flag for ts-node to pick up decorator support
-- uuid-ossp extension must be created by superuser (postgres) before running migrations that use uuid_generate_v4()
-- PostGraphile uses postgraphile-nest for NestJS integration; use PostGraphileModule.forRootAsync() with factory function
-- PostGraphile auto-generates GraphQL API from database; queries use connection pattern: allItems { nodes { ... } }
-- Apollo Client uses typed generics: apolloClient.query<ResponseType>({ query }) for proper TypeScript inference
-- GraphQL data from PostGraphile converts snake_case columns to camelCase in GraphQL schema
-- TypeORM 0.3.x uses DataSource and DataSourceOptions instead of Connection/ConnectionOptions
-- TypeORM migration:generate requires -d src/config/typeorm.ts to specify data source
+- NestJS apps need `root: true` in `.eslintrc.js` and must be added to root `.prettierignore` and `.eslintrc.js` ignorePatterns (root config doesn't support decorators)
+- `.env.local` is gitignored by default - use `.env.example` for committed env template
+- TypeORM config uses `SnakeNamingStrategy` for PostgreSQL column naming conventions
+- Use `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` in CLI scripts and `'../.env.local'` in main.ts
+- Entity registry pattern: centralize all entities in `src/config/entities.ts`
 
+---
+
+## 2026-02-26 - US-001
+- What was implemented: Backend project scaffolding for tictactoe-api
+- Files changed:
+  - apps/tictactoe-api/package.json (NestJS deps, scripts)
+  - apps/tictactoe-api/tsconfig.json, tsconfig.build.json, nest-cli.json
+  - apps/tictactoe-api/.eslintrc.js (root: true for decorator support)
+  - apps/tictactoe-api/docker-compose.yml (postgres:16 on port 54322)
+  - apps/tictactoe-api/.env.local, .env.example
+  - apps/tictactoe-api/src/config/entities.ts (empty array placeholder)
+  - Root .prettierignore, .eslintrc.js (added tictactoe-api to ignore)
+- **Learnings for future iterations:**
+  - .env.local is gitignored - don't try to `git add` it
+  - pnpm install succeeds with peer dep warnings for postgraphile-nest (expects NestJS ^7 but we use ^8) - this is fine, same as realty-ai-api
+  - Need at least one .ts file in src/ for typecheck to work (created entities.ts early)
+---
+
+## 2026-02-26 - US-002
+- What was implemented: Database configuration utilities for TypeORM and PostGraphile
+- Files changed:
+  - apps/tictactoe-api/src/config/postgres.ts (getConfig, getAdminConfig, getClient with port 54322 and db 'tictactoe')
+  - apps/tictactoe-api/src/config/typeorm.ts (getTypeOrmConfig, getTypeOrmModuleConfig with SnakeNamingStrategy, default DataSource export for CLI)
+  - apps/tictactoe-api/src/config/graphile.ts (postgraphileConfigFactory for PostGraphile NestJS integration)
+- **Learnings for future iterations:**
+  - entities.ts was already created in US-001 scaffolding - no need to recreate it
+  - typeorm.ts dotenv.config() path uses `__dirname + '../../.env.local'` since the file is in src/config/
+  - graphile.ts is identical to realty-ai-api version - no project-specific changes needed
+---
+
+## 2026-02-26 - US-003
+- What was implemented: Game entity with TypeORM decorators and type exports
+- Files changed:
+  - apps/tictactoe-api/src/modules/game/game.entity.ts (Game entity with id, boardState, status, winner, moves, createdAt, updatedAt; CellValue, GameMove, GameStatus type exports)
+  - apps/tictactoe-api/src/config/entities.ts (added Game to entity registry)
+- **Learnings for future iterations:**
+  - JSONB column defaults must be plain JS values (arrays/objects), TypeORM handles serialization
+  - SnakeNamingStrategy auto-converts camelCase property names to snake_case column names, but explicit `name` in @Column/@CreateDateColumn is still best practice for clarity
+  - Game module directory was pre-created in US-001 scaffolding as empty dir
 ---

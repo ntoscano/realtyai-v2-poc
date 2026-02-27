@@ -22,7 +22,7 @@
 				"Typecheck passes"
 			],
 			"priority": 1,
-			"passes": false,
+			"passes": true,
 			"notes": "Mirror realty-ai-api scaffolding. Root eslint/prettier configs don't support decorators - must add to ignorePatterns. NestJS CLI requires tsconfig.build.json."
 		},
 		{
@@ -38,7 +38,7 @@
 				"Typecheck passes"
 			],
 			"priority": 2,
-			"passes": false,
+			"passes": true,
 			"notes": "TypeORM 0.3.x uses DataSource. typeorm.ts needs dotenv.config() with explicit path for CLI operations. Export default DataSource for CLI and getTypeOrmModuleConfig() for NestJS."
 		},
 		{
@@ -53,7 +53,7 @@
 				"Typecheck passes"
 			],
 			"priority": 3,
-			"passes": false,
+			"passes": true,
 			"notes": "Follow Property entity pattern from realty-ai-api/src/modules/property/property.entity.ts. Use @CreateDateColumn and @UpdateDateColumn for timestamps. JSONB columns with typed interfaces."
 		},
 		{
