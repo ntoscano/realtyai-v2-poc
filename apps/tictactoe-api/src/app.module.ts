@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { postgraphileConfigFactory } from './config/graphile';
 import { getTypeOrmModuleConfig } from './config/typeorm';
+import { GameModule } from './modules/game/game.module';
 
 @Module({
 	imports: [
@@ -14,6 +15,7 @@ import { getTypeOrmModuleConfig } from './config/typeorm';
 			inject: [],
 			useFactory: postgraphileConfigFactory,
 		}),
+		GameModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
