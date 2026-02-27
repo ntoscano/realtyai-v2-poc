@@ -255,7 +255,7 @@
 				"Verify in browser: play a full game to completion, verify history sidebar updates"
 			],
 			"priority": 15,
-			"passes": false,
+			"passes": true,
 			"notes": "Import all components, gameLogic functions, useGameHistory hook, apolloClient, and mutations. Game status checks after BOTH human and AI moves (human could win before AI plays). isAiThinking flag prevents clicks during API call. Frontend is source of truth for in-progress game; backend only receives completed games."
 		}
 	]

@@ -211,3 +211,17 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - Date formatting uses toLocaleDateString with month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   - No browser testing tools available - manual browser verification needed
 ---
+
+## 2026-02-26 - US-015
+- What was implemented: Main game page (page.tsx) with full game state management, AI integration, and game history persistence
+- Files changed:
+  - apps/tictactoe/src/app/page.tsx (rewrote from placeholder to full 'use client' component with useState GameState, handleCellClick with human+AI moves, handleNewGame reset, saveCompletedGame via GraphQL mutation, 2-column layout with game board and history sidebar)
+- **Learnings for future iterations:**
+  - Game status must be checked after BOTH human move and AI response - human can win/draw before AI plays
+  - isAiThinking flag prevents double-clicks during API call by disabling board and guarding handleCellClick
+  - saveCompletedGame is fire-and-forget (try/catch with console.error only) - failed saves don't break the game UX
+  - Frontend is source of truth for in-progress games; backend only receives completed games via createGame mutation
+  - API route returns `{ position, board }` - use the returned board directly rather than recomputing
+  - Layout: md:grid-cols-3 with game area at md:col-span-2 and sidebar at col-span-1
+  - No browser testing tools available - manual browser verification needed
+---
