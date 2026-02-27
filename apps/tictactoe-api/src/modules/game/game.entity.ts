@@ -25,6 +25,11 @@ export interface GameMove {
  */
 export type GameStatus = 'in_progress' | 'x_wins' | 'o_wins' | 'draw';
 
+/**
+ * Game mode: AI or Player vs Player
+ */
+export type GameMode = 'ai' | 'pvp';
+
 @Entity('game')
 export class Game {
 	@PrimaryGeneratedColumn('uuid')
@@ -45,6 +50,18 @@ export class Game {
 
 	@Column({ type: 'jsonb', default: [] })
 	moves: GameMove[];
+
+	@Column({ type: 'varchar', length: 10, default: 'ai' })
+	mode: GameMode;
+
+	@Column({ type: 'varchar', length: 1, default: 'X' })
+	currentTurn: 'X' | 'O';
+
+	@Column({ type: 'uuid', nullable: true })
+	playerXToken: string | null;
+
+	@Column({ type: 'uuid', nullable: true })
+	playerOToken: string | null;
 
 	@CreateDateColumn({ name: 'created_at' })
 	createdAt: Date;
