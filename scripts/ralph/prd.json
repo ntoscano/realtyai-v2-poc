@@ -171,7 +171,7 @@
 				"Typecheck passes"
 			],
 			"priority": 10,
-			"passes": false,
+			"passes": true,
 			"notes": "Follow patterns from realty-ai/src/lib/ai/emailGraph.ts (StateGraph), nodes.ts (retry logic with MAX_GENERATION_ATTEMPTS=3), graphState.ts (Annotation.Root). DeepSeek-R1 wraps reasoning in <think>...</think> tags that must be stripped before parsing. Response content may be string or array of content blocks."
 		},
 		{

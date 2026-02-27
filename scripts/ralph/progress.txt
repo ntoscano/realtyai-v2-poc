@@ -13,6 +13,9 @@ Started: Thu Feb 26 16:55:08 PST 2026
 - Use `app.enableCors()` in NestJS main.ts for cross-origin frontend requests
 - Frontend port assignments: realty-ai=2024, tictactoe=2025; Backend: realty-ai-api=3001, tictactoe-api=3002
 - Next.js frontend apps need at least `src/app/page.tsx` and `src/app/layout.tsx` for typecheck to work
+- Zod v4 `.refine()` second arg must be string or `{ message: string }` object, NOT a function (differs from v3)
+- LangGraph pattern: Annotation.Root state → node functions returning Partial<State> → StateGraph with addNode/addEdge → compile
+- DeepSeek-R1 wraps reasoning in `<think>...</think>` tags - strip before parsing LLM output
 
 ---
 
@@ -137,4 +140,21 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - getCurrentTurn counts X's and O's to determine turn (X goes first, so X count <= O count means X's turn)
   - formatBoardForDisplay uses '.' for empty cells - this format is used in the LLM prompt
   - Linter reformats to tabs (project uses tabs, not spaces)
+---
+
+## 2026-02-26 - US-010
+- What was implemented: LangGraph AI move pipeline with 6 files for LLM-powered tic-tac-toe move generation
+- Files changed:
+  - apps/tictactoe/src/lib/ai/llm.ts (ChatBedrockConverse instance with DeepSeek-R1, temp 0.7, maxTokens 256)
+  - apps/tictactoe/src/lib/ai/movePrompt.ts (ChatPromptTemplate with system/user messages for move selection)
+  - apps/tictactoe/src/lib/ai/moveValidator.ts (Zod schema for position validation, parseMoveResponse strips <think> tags)
+  - apps/tictactoe/src/lib/ai/graphState.ts (Annotation.Root with board, available_positions, board_display, ai_move)
+  - apps/tictactoe/src/lib/ai/nodes.ts (inputValidationNode, moveGenerationNode with 3 retries, moveValidationNode)
+  - apps/tictactoe/src/lib/ai/moveGraph.ts (StateGraph: START -> inputValidation -> moveGeneration -> moveValidation -> END)
+- **Learnings for future iterations:**
+  - Zod v4 `.refine()` second argument must be a string or options object `{ message: string }`, NOT a function returning a string (v3 pattern doesn't work)
+  - DeepSeek-R1 response content may be string or array of content blocks - must handle both cases
+  - LLM response parsing: strip `<think>...</think>` tags first, then extract digit 0-8
+  - LangGraph StateGraph pattern: define Annotation.Root state, create node functions returning Partial<State>, chain with addNode/addEdge, compile
+  - Linter will reformat long template strings - check committed code matches expected formatting
 ---
