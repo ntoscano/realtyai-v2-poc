@@ -158,3 +158,15 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - LangGraph StateGraph pattern: define Annotation.Root state, create node functions returning Partial<State>, chain with addNode/addEdge, compile
   - Linter will reformat long template strings - check committed code matches expected formatting
 ---
+
+## 2026-02-26 - US-011
+- What was implemented: AI move API route (POST /api/ai-move) that accepts a board state, validates it, invokes the LangGraph AI move pipeline, and returns the AI's chosen position with updated board
+- Files changed:
+  - apps/tictactoe/src/app/api/ai-move/route.ts (new file - POST handler with board validation, game-over check, moveGraph invocation, defense-in-depth move validation, error handling)
+- **Learnings for future iterations:**
+  - Follow realty-ai generate-email route pattern: try/catch with SyntaxError check for malformed JSON, surface error messages from LLM failures
+  - Board validation uses type guard functions (isValidCellValue, isValidBoard) for clean TypeScript narrowing
+  - AI always plays 'O' - hardcoded in applyMove call since human is always 'X'
+  - Defense in depth: double-check AI move with isValidMove before responding, even though the LangGraph pipeline has its own validation
+  - Linter reformats multi-line imports to single-line and collapses short boolean expressions - run eslint --fix before committing
+---
