@@ -206,7 +206,7 @@
 				"Typecheck passes"
 			],
 			"priority": 12,
-			"passes": false,
+			"passes": true,
 			"notes": "PostGraphile converts snake_case to camelCase in GraphQL (board_state -> boardState). Auto-generated types: CreateGameInput has game: {...} wrapper, UpdateGameByIdInput has id + gamePatch: {...}. Follow pattern from realty-ai/src/lib/graphql/. Apollo Client uses typed generics for TypeScript safety."
 		},
 		{

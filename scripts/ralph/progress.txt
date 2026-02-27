@@ -170,3 +170,18 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - Defense in depth: double-check AI move with isValidMove before responding, even though the LangGraph pipeline has its own validation
   - Linter reformats multi-line imports to single-line and collapses short boolean expressions - run eslint --fix before committing
 ---
+
+## 2026-02-26 - US-012
+- What was implemented: GraphQL integration layer with Apollo Client, queries, mutations, transforms, and hooks
+- Files changed:
+  - apps/tictactoe/src/lib/graphql/client.ts (Apollo Client with HttpLink to localhost:3002/graphql, cache-and-network/network-only policies)
+  - apps/tictactoe/src/lib/graphql/queries.ts (GET_ALL_GAMES with CREATED_AT_DESC ordering, GET_GAME_BY_ID)
+  - apps/tictactoe/src/lib/graphql/mutations.ts (CREATE_GAME with CreateGameInput, UPDATE_GAME with UpdateGameByIdInput)
+  - apps/tictactoe/src/lib/graphql/transforms.ts (GraphQLGameNode type, transformGameToSummary function)
+  - apps/tictactoe/src/lib/graphql/hooks.ts (useGameHistory hook with games/loading/error/refetch)
+- **Learnings for future iterations:**
+  - Apollo Client pattern is identical to realty-ai except for port (3002 vs 3001)
+  - useGameHistory exposes a `refetch` function so the game page can refresh history after saving a completed game
+  - GraphQLGameNode type maps PostGraphile's camelCase fields (boardState, createdAt) to frontend types
+  - transformGameToSummary handles null winner and missing moves array gracefully with nullish coalescing
+---
