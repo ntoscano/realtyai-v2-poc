@@ -125,3 +125,16 @@ Started: Thu Feb 26 16:55:08 PST 2026
   - globals.css CSS variables define the shadcn/ui theme - required for component styles to work
   - layout.tsx needs `import './globals.css'` for styles to be applied
 ---
+
+## 2026-02-26 - US-009
+- What was implemented: Game types (CellValue, Board, GameMove, GameStatus, GameState, GameSummary) and deterministic game logic functions
+- Files changed:
+  - apps/tictactoe/src/types/game.ts (all game type definitions)
+  - apps/tictactoe/src/lib/game/gameLogic.ts (WIN_LINES, checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay)
+- **Learnings for future iterations:**
+  - Board type is a 9-element tuple, not an array - use `as Board` when spreading
+  - All game logic functions are pure - no state mutations, always return new values
+  - getCurrentTurn counts X's and O's to determine turn (X goes first, so X count <= O count means X's turn)
+  - formatBoardForDisplay uses '.' for empty cells - this format is used in the LLM prompt
+  - Linter reformats to tabs (project uses tabs, not spaces)
+---

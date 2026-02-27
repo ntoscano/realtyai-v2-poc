@@ -154,7 +154,7 @@
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": false,
+			"passes": true,
 			"notes": "Board is a flat 9-element array. Indices 0-8 map left-to-right, top-to-bottom. X always goes first. formatBoardForDisplay shows '.' for empty, 'X'/'O' for played cells in a 3x3 text grid."
 		},
 		{
