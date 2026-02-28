@@ -1,8 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+	BadRequestException,
+	Injectable,
+	NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
+import {
+	applyMove,
+	getGameStatus,
+	isValidMove,
+} from '../../lib/game/gameLogic';
+import { Board } from '../../lib/game/types';
 import { CreateGameDto } from './dto/create-game.dto';
 import { CreateGameResponseDto, GameStateDto } from './dto/game-state.dto';
 import { Game } from './game.entity';
@@ -12,6 +22,7 @@ export class GameService {
 	constructor(
 		@InjectRepository(Game)
 		private readonly gameRepository: Repository<Game>,
+		private readonly dataSource: DataSource,
 	) {}
 
 	async createGame(dto: CreateGameDto): Promise<CreateGameResponseDto> {
@@ -44,6 +55,69 @@ export class GameService {
 		}
 
 		return this.toGameStateDto(game);
+	}
+
+	async makeMove(id: string, position: number): Promise<GameStateDto> {
+		const queryRunner = this.dataSource.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
+
+		try {
+			const game = await queryRunner.manager
+				.getRepository(Game)
+				.createQueryBuilder('game')
+				.setLock('pessimistic_write')
+				.where('game.id = :id', { id })
+				.getOne();
+
+			if (!game) {
+				throw new NotFoundException(`Game with ID "${id}" not found`);
+			}
+
+			if (game.status !== 'in_progress') {
+				throw new BadRequestException('Game is not in progress');
+			}
+
+			const board = game.boardState as Board;
+
+			if (!isValidMove(board, position)) {
+				throw new BadRequestException(
+					`Invalid move: position ${position} is not available`,
+				);
+			}
+
+			const newBoard = applyMove(board, position, game.currentTurn);
+			const moveNumber = game.moves.length + 1;
+
+			game.boardState = newBoard;
+			game.moves = [
+				...game.moves,
+				{ position, player: game.currentTurn, moveNumber },
+			];
+
+			const status = getGameStatus(newBoard);
+			game.status = status;
+
+			if (status === 'x_wins') {
+				game.winner = 'X';
+			} else if (status === 'o_wins') {
+				game.winner = 'O';
+			} else if (status === 'draw') {
+				game.winner = null;
+			} else {
+				game.currentTurn = game.currentTurn === 'X' ? 'O' : 'X';
+			}
+
+			await queryRunner.manager.save(game);
+			await queryRunner.commitTransaction();
+
+			return this.toGameStateDto(game);
+		} catch (error) {
+			await queryRunner.rollbackTransaction();
+			throw error;
+		} finally {
+			await queryRunner.release();
+		}
 	}
 
 	private toGameStateDto(game: Game): GameStateDto {
