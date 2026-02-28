@@ -2,6 +2,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Headers,
 	Param,
 	Post,
 	Query,
@@ -49,7 +50,8 @@ export class GameController {
 	async makeMove(
 		@Param('id') id: string,
 		@Body() dto: MakeMoveDto,
+		@Headers('x-player-token') playerToken?: string,
 	): Promise<GameStateDto> {
-		return this.gameService.makeMove(id, dto.position);
+		return this.gameService.makeMove(id, dto.position, playerToken);
 	}
 }

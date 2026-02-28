@@ -1,6 +1,7 @@
 import {
 	BadRequestException,
 	ConflictException,
+	ForbiddenException,
 	Injectable,
 	InternalServerErrorException,
 	NotFoundException,
@@ -95,7 +96,11 @@ export class GameService {
 		};
 	}
 
-	async makeMove(id: string, position: number): Promise<GameStateDto> {
+	async makeMove(
+		id: string,
+		position: number,
+		playerToken?: string,
+	): Promise<GameStateDto> {
 		const queryRunner = this.dataSource.createQueryRunner();
 		await queryRunner.connect();
 		await queryRunner.startTransaction();
@@ -114,6 +119,26 @@ export class GameService {
 
 			if (game.status !== 'in_progress') {
 				throw new BadRequestException('Game is not in progress');
+			}
+
+			// Validate player token in PvP mode
+			if (game.mode === 'pvp') {
+				if (!playerToken) {
+					throw new ForbiddenException(
+						'X-Player-Token header is required for PvP games',
+					);
+				}
+
+				const expectedToken =
+					game.currentTurn === 'X'
+						? game.playerXToken
+						: game.playerOToken;
+
+				if (playerToken !== expectedToken) {
+					throw new ForbiddenException(
+						'Invalid player token for the current turn',
+					);
+				}
 			}
 
 			const board = game.boardState as Board;
