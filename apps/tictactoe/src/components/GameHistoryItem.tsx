@@ -12,7 +12,10 @@ function getResultBadge(game: GameSummary) {
 	if (game.status === 'o_wins') {
 		return <Badge variant="destructive">Loss</Badge>;
 	}
-	return <Badge variant="secondary">Draw</Badge>;
+	if (game.status === 'draw') {
+		return <Badge variant="secondary">Draw</Badge>;
+	}
+	return null;
 }
 
 export function GameHistoryItem({ game }: GameHistoryItemProps) {
@@ -31,7 +34,12 @@ export function GameHistoryItem({ game }: GameHistoryItemProps) {
 					{game.moveCount} moves
 				</span>
 			</div>
-			{getResultBadge(game)}
+			<div className="flex items-center gap-1.5">
+				<Badge variant={game.mode === 'ai' ? 'secondary' : 'outline'}>
+					{game.mode === 'ai' ? 'AI' : 'PvP'}
+				</Badge>
+				{getResultBadge(game)}
+			</div>
 		</div>
 	);
 }

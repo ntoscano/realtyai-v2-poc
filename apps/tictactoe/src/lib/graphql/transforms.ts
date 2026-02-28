@@ -1,5 +1,6 @@
 import type {
 	CellValue,
+	GameMode,
 	GameMove,
 	GameStatus,
 	GameSummary,
@@ -11,6 +12,7 @@ export type GraphQLGameNode = {
 	status: string;
 	winner: string | null;
 	moves: GameMove[];
+	mode: string;
 	createdAt: string;
 };
 
@@ -20,6 +22,7 @@ export function transformGameToSummary(node: GraphQLGameNode): GameSummary {
 		status: node.status as GameStatus,
 		winner: (node.winner as CellValue) ?? null,
 		moveCount: node.moves?.length ?? 0,
+		mode: (node.mode as GameMode) ?? 'ai',
 		createdAt: node.createdAt,
 	};
 }

@@ -384,7 +384,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 22,
-			"passes": false,
+			"passes": true,
 			"notes": "Can be a simple component with two Button variants (default vs outline). Place above or below the game board in /game/[id]/page.tsx."
 		},
 		{
@@ -399,7 +399,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 23,
-			"passes": false,
+			"passes": true,
 			"notes": "File: apps/tictactoe/src/components/GameHistoryItem.tsx. The REST endpoint returns mode field. May need to update useGameHistory hook or create a new hook that uses gameApi.listGames()."
 		}
 	]

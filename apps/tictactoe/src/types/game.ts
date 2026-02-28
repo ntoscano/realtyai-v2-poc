@@ -29,10 +29,13 @@ export interface GameState {
 	isAiThinking: boolean;
 }
 
+export type GameMode = 'ai' | 'pvp';
+
 export interface GameSummary {
 	id: string;
 	status: GameStatus;
 	winner: CellValue;
 	moveCount: number;
+	mode: GameMode;
 	createdAt: string;
 }

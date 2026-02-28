@@ -1,16 +1,8 @@
 'use client';
 
-import type { GameSummary } from '@/types/game';
+import { listGames } from '@/lib/api/gameApi';
+import type { GameMode, GameSummary } from '@/types/game';
 import { useEffect, useState } from 'react';
-import { apolloClient } from './client';
-import { GET_ALL_GAMES } from './queries';
-import { type GraphQLGameNode, transformGameToSummary } from './transforms';
-
-type AllGamesResponse = {
-	allGames: {
-		nodes: GraphQLGameNode[];
-	};
-};
 
 export function useGameHistory() {
 	const [games, setGames] = useState<GameSummary[]>([]);
@@ -19,15 +11,16 @@ export function useGameHistory() {
 
 	async function fetchGames() {
 		try {
-			const result = await apolloClient.query<AllGamesResponse>({
-				query: GET_ALL_GAMES,
-			});
-			if (result.data?.allGames?.nodes) {
-				const transformed = result.data.allGames.nodes.map(
-					transformGameToSummary,
-				);
-				setGames(transformed);
-			}
+			const results = await listGames();
+			const summaries: GameSummary[] = results.map((g) => ({
+				id: g.id,
+				status: g.status,
+				winner: g.winner as GameSummary['winner'],
+				moveCount: g.moves?.length ?? 0,
+				mode: g.mode as GameMode,
+				createdAt: g.createdAt,
+			}));
+			setGames(summaries);
 		} catch (err) {
 			setError(err instanceof Error ? err : new Error('Failed to fetch games'));
 		} finally {

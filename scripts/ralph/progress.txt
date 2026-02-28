@@ -319,3 +319,30 @@ Started: Fri Feb 27 15:47:49 PST 2026
   - Verified with psql: SELECT works, INSERT/UPDATE/DELETE all return "permission denied for table game"
   - The PostGraphile config in graphile.ts overrides only `user` and `password` fields — host, port, and database are shared from the common postgres config
 ---
+
+## 2026-02-27 - US-022
+- Added mode toggle UI component for switching between AI and PvP modes
+- Files changed:
+  - `apps/tictactoe/src/components/ModeToggle.tsx` - New component: two buttons ("Play vs AI" / "Play vs Human") using Button component with default/outline variants to indicate current mode
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Imported ModeToggle, placed between title and GameStatus; onSelectMode navigates to `/` (AI) or `/x` (PvP)
+- **Learnings for future iterations:**
+  - The existing Button component with `variant` prop (default vs outline) provides a clean toggle pattern — no need for a dedicated toggle/tab component
+  - ModeToggle accepts `currentMode` and `onSelectMode` — current mode is highlighted with `default` variant, other mode uses `outline`
+  - Navigation to `/` creates a new AI game, navigation to `/x` creates a new PvP game — the existing page.tsx and /x/page.tsx handle creation on mount
+  - Component placed between the h1 title and GameStatus for visual prominence without cluttering the board area
+---
+
+## 2026-02-27 - US-023
+- Added mode labels to game history sidebar and migrated history fetching from GraphQL to REST API
+- Files changed:
+  - `apps/tictactoe/src/types/game.ts` - Added GameMode type ('ai' | 'pvp') and mode field to GameSummary interface
+  - `apps/tictactoe/src/components/GameHistoryItem.tsx` - Added mode badge (AI with secondary variant, PvP with outline variant) next to result badge; in_progress games no longer show a result badge
+  - `apps/tictactoe/src/lib/graphql/hooks.ts` - Replaced GraphQL apolloClient.query with REST listGames() from gameApi; maps GameStateDto to GameSummary with mode field
+  - `apps/tictactoe/src/lib/graphql/transforms.ts` - Added mode field to GraphQLGameNode type and transformGameToSummary output (for type compatibility)
+  - `scripts/ralph/prd.json` - Marked US-023 as passes: true
+- **Learnings for future iterations:**
+  - When adding a required field to a shared type like GameSummary, ALL consumers must be updated — including transform functions that may not be actively used anymore
+  - The useGameHistory hook still lives in lib/graphql/hooks.ts despite now using REST — a future cleanup could move it to lib/api/ or rename the directory
+  - Badge component supports 4 variants: default, secondary, destructive, outline — secondary (muted bg) for AI and outline (border only) for PvP provides good visual distinction
+  - getResultBadge returns null for in_progress games (no result badge) — previously it always returned a Draw badge as default
+---
