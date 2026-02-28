@@ -4,6 +4,7 @@ import {
 	Get,
 	Param,
 	Post,
+	Query,
 	UsePipes,
 	ValidationPipe,
 } from '@nestjs/common';
@@ -21,6 +22,14 @@ export class GameController {
 	@UsePipes(new ValidationPipe({ whitelist: true }))
 	async createGame(@Body() dto: CreateGameDto): Promise<CreateGameResponseDto> {
 		return this.gameService.createGame(dto);
+	}
+
+	@Get()
+	async listGames(@Query('limit') limit?: string): Promise<GameStateDto[]> {
+		const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+		return this.gameService.listGames(
+			parsedLimit && !isNaN(parsedLimit) ? parsedLimit : undefined,
+		);
 	}
 
 	@Get(':id')

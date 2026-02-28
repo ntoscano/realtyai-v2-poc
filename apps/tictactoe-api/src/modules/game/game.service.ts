@@ -47,6 +47,15 @@ export class GameService {
 		};
 	}
 
+	async listGames(limit = 20): Promise<GameStateDto[]> {
+		const games = await this.gameRepository.find({
+			order: { createdAt: 'DESC' },
+			take: limit,
+		});
+
+		return games.map((game) => this.toGameStateDto(game));
+	}
+
 	async getGame(id: string): Promise<GameStateDto> {
 		const game = await this.gameRepository.findOne({ where: { id } });
 
