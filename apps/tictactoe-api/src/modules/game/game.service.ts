@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
@@ -34,6 +34,16 @@ export class GameService {
 			game: this.toGameStateDto(saved),
 			playerToken: playerXToken,
 		};
+	}
+
+	async getGame(id: string): Promise<GameStateDto> {
+		const game = await this.gameRepository.findOne({ where: { id } });
+
+		if (!game) {
+			throw new NotFoundException(`Game with ID "${id}" not found`);
+		}
+
+		return this.toGameStateDto(game);
 	}
 
 	private toGameStateDto(game: Game): GameStateDto {
