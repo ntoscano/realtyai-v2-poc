@@ -2,7 +2,7 @@ import { getConfig } from './postgres';
 
 /**
  * PostGraphile configuration factory for NestJS integration.
- * Returns configuration options for the PostGraphile module.
+ * Uses a read-only postgraphile_user role to prevent mutations via GraphQL.
  */
 export const postgraphileConfigFactory = () => {
 	const pgConfig = getConfig();
@@ -11,8 +11,9 @@ export const postgraphileConfigFactory = () => {
 		pgConfig: {
 			host: pgConfig.host,
 			port: pgConfig.port,
-			user: pgConfig.user,
-			password: pgConfig.password,
+			user: process.env.POSTGRAPHILE_USER || 'postgraphile_user',
+			password:
+				process.env.POSTGRAPHILE_PASSWORD || 'postgraphile',
 			database: pgConfig.database,
 		},
 		graphiql: process.env.GRAPHIQL_ENABLED === 'true',

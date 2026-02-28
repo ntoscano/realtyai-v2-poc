@@ -330,7 +330,7 @@
 				"Typecheck passes"
 			],
 			"priority": 19,
-			"passes": false,
+			"passes": true,
 			"notes": "NestJS 8 @WebSocketGateway is stable. Use @WebSocketServer() decorator for Server instance. Redis adapter: createAdapter(ioredis pub, ioredis sub). Inject GameGateway into GameService."
 		},
 		{
@@ -350,7 +350,7 @@
 				"Verify in browser using dev-browser skill: open two tabs with same PvP game, make move in one, verify other updates"
 			],
 			"priority": 20,
-			"passes": false,
+			"passes": true,
 			"notes": "Use socket.io-client: io(url + '/game', { transports: ['websocket'] }). Store socket in useRef. Cleanup in useEffect return."
 		},
 		{
@@ -368,7 +368,7 @@
 				"Typecheck passes"
 			],
 			"priority": 21,
-			"passes": false,
+			"passes": true,
 			"notes": "Two DB connections: PostGraphile (read-only postgraphile_user role) and TypeORM (full-access postgres role). Migration SQL: CREATE ROLE postgraphile_user WITH LOGIN PASSWORD 'postgraphile'; GRANT SELECT ON game TO postgraphile_user;"
 		},
 		{

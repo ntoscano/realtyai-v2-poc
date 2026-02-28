@@ -1,4 +1,7 @@
 ## Codebase Patterns
+- WebSocket gateway at `apps/tictactoe-api/src/modules/game/game.gateway.ts` — uses @nestjs/websockets v10 + @nestjs/platform-socket.io v10 (must match NestJS core version)
+- Redis adapter configured in `afterInit()` via OnGatewayInit lifecycle hook — uses ioredis pub/sub clients with `pubClient.duplicate()` for sub client
+- GameGateway is a provider in GameModule, injected into GameService for broadcasting PvP game updates
 - Use SnakeNamingStrategy: camelCase in TypeScript -> snake_case in DB columns (automatic via TypeORM config)
 - Migrations are in `apps/tictactoe-api/src/migrations/` with timestamp prefix
 - Run migrations with `pnpm typeorm:migration:run` from `apps/tictactoe-api/`
@@ -18,6 +21,8 @@
 - AI files use kebab-case filenames: move-graph.ts, graph-state.ts, move-validator.ts, move-prompt.ts, llm.ts, nodes.ts
 - NestJS upgraded to v10, TypeScript upgraded to v5.9 — required for compatibility with zod v4 (transitive dep from @langchain/core)
 - AWS Bedrock env vars: AI_AWS_BEDROCK_ACCESS_KEY_ID, AI_AWS_BEDROCK_SECRET_ACCESS_KEY, AI_AWS_BEDROCK_REGION
+- Two DB connections: TypeORM uses postgres superuser (full access), PostGraphile uses postgraphile_user (SELECT only) — configured in separate config files (typeorm.ts vs graphile.ts)
+- PostGraphile credentials: POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD env vars (defaults: postgraphile_user / postgraphile)
 
 # Ralph Progress Log
 Started: Fri Feb 27 15:47:49 PST 2026
@@ -267,4 +272,50 @@ Started: Fri Feb 27 15:47:49 PST 2026
   - No application code changes needed for this story — purely infrastructure
   - Redis accessible at localhost:6379, verified via `docker exec tictactoe-redis redis-cli ping` → PONG
   - docker-compose up -d starts both PostgreSQL and Redis containers successfully
+---
+
+## 2026-02-27 - US-019
+- Implemented WebSocket gateway for PvP real-time updates
+- Files changed:
+  - `apps/tictactoe-api/package.json` - Added @nestjs/websockets, @nestjs/platform-socket.io (v10), socket.io, @socket.io/redis-adapter, ioredis
+  - `apps/tictactoe-api/src/modules/game/game.gateway.ts` - New file: WebSocket gateway with /game namespace, Redis adapter, joinGame handler, broadcastGameUpdate method
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added GameGateway to providers array
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected GameGateway, calls broadcastGameUpdate() after successful PvP moves
+  - `pnpm-lock.yaml` - Updated with new WebSocket dependencies
+- **Learnings for future iterations:**
+  - @nestjs/websockets and @nestjs/platform-socket.io versions MUST match @nestjs/core version — v11 requires @nestjs/common v11. Since we use NestJS 10, must install v10.x specifically
+  - OnGatewayInit.afterInit(server) is the correct lifecycle hook for configuring the Redis adapter — the server instance is passed as parameter
+  - ioredis `pubClient.duplicate()` creates a matching sub client for the Redis adapter — avoids creating two separate Redis instances
+  - GameGateway broadcast is placed AFTER queryRunner.commitTransaction() to ensure the DB state is committed before clients receive the update
+  - The broadcast only fires for PvP mode moves (`game.mode === 'pvp'`) — AI mode doesn't need WebSocket updates
+  - Socket.IO rooms use `game-{gameId}` naming convention; clients emit `joinGame` with `{ gameId }` to join
+---
+
+## 2026-02-27 - US-020
+- Created frontend WebSocket hook for PvP real-time updates and integrated it into the game page
+- Files changed:
+  - `apps/tictactoe/src/lib/api/useGameSocket.ts` - New React hook: connects to Socket.IO /game namespace in PvP mode, emits joinGame on connect, listens for gameUpdate events, cleans up on unmount
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Added useGameSocket call: passes gameId (null until game loaded), game mode, and setGame callback for real-time updates
+- **Learnings for future iterations:**
+  - Use `useRef` for the onUpdate callback to avoid socket reconnections when the callback identity changes (common React pattern for event handlers in effects)
+  - The hook passes `game ? gameId : null` as first arg to delay socket connection until the game is loaded and mode is known — avoids connecting with wrong mode
+  - `game?.mode ?? 'ai'` defaults to 'ai' before game loads, so the hook does nothing (no-op for AI mode) — safe default
+  - socket.io-client was already added to package.json in US-016 — no additional dependency install needed
+  - The hook is intentionally simple: no reconnection logic or error handling beyond socket.io-client defaults — socket.io handles reconnection automatically
+---
+
+## 2026-02-27 - US-021
+- Implemented PostGraphile read-only security via PostgreSQL roles
+- Files changed:
+  - `apps/tictactoe-api/src/migrations/1772320000000-CreatePostgraphileReadOnlyRole.ts` - New migration: creates postgraphile_user role with LOGIN, grants SELECT on game table, revokes INSERT/UPDATE/DELETE
+  - `apps/tictactoe-api/src/config/graphile.ts` - Updated PostGraphile config to use POSTGRAPHILE_USER/POSTGRAPHILE_PASSWORD env vars instead of the main postgres superuser
+  - `apps/tictactoe-api/.env.local` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
+  - `apps/tictactoe-api/.env.example` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
+  - `scripts/ralph/prd.json` - Marked US-021 as passes: true
+- **Learnings for future iterations:**
+  - Use `DO $$ BEGIN IF NOT EXISTS ... END $$` pattern for idempotent role creation — avoids errors if migration is re-run
+  - Two separate DB connections coexist: TypeORM uses postgres superuser (full read/write for GameService), PostGraphile uses postgraphile_user (SELECT only)
+  - `GRANT CONNECT ON DATABASE` and `GRANT USAGE ON SCHEMA public` are needed in addition to table-level GRANT SELECT — without these the role can't even access the schema
+  - Verified with psql: SELECT works, INSERT/UPDATE/DELETE all return "permission denied for table game"
+  - The PostGraphile config in graphile.ts overrides only `user` and `password` fields — host, port, and database are shared from the common postgres config
 ---
