@@ -20,6 +20,7 @@ import { AiService } from '../ai/ai.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { CreateGameResponseDto, GameStateDto } from './dto/game-state.dto';
 import { Game } from './game.entity';
+import { GameGateway } from './game.gateway';
 
 @Injectable()
 export class GameService {
@@ -28,6 +29,7 @@ export class GameService {
 		private readonly gameRepository: Repository<Game>,
 		private readonly dataSource: DataSource,
 		private readonly aiService: AiService,
+		private readonly gameGateway: GameGateway,
 	) {}
 
 	async createGame(dto: CreateGameDto): Promise<CreateGameResponseDto> {
@@ -210,7 +212,14 @@ export class GameService {
 			await queryRunner.manager.save(game);
 			await queryRunner.commitTransaction();
 
-			return this.toGameStateDto(game);
+			const gameState = this.toGameStateDto(game);
+
+			// Broadcast update to PvP game room
+			if (game.mode === 'pvp') {
+				this.gameGateway.broadcastGameUpdate(id, gameState);
+			}
+
+			return gameState;
 		} catch (error) {
 			await queryRunner.rollbackTransaction();
 			throw error;
