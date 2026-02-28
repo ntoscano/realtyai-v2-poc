@@ -97,7 +97,12 @@ export default function GamePage() {
 				<h1 className="text-3xl font-bold">
 					{game.mode === 'pvp' ? 'PvP Tic-Tac-Toe' : 'AI Tic-Tac-Toe'}
 				</h1>
-				<GameStatus status={game.status} isAiThinking={isAiThinking} />
+				<GameStatus
+					status={game.status}
+					isAiThinking={isAiThinking}
+					mode={game.mode}
+					currentTurn={game.currentTurn}
+				/>
 				<GameBoard
 					board={board}
 					onCellClick={handleCellClick}
