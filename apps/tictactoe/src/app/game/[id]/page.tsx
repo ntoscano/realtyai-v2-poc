@@ -2,6 +2,7 @@
 
 import { GameBoard } from '@/components/GameBoard';
 import { GameStatus } from '@/components/GameStatus';
+import { ModeToggle } from '@/components/ModeToggle';
 import { NewGameButton } from '@/components/NewGameButton';
 import { getGame, makeMove } from '@/lib/api/gameApi';
 import type { GameStateDto } from '@/lib/api/gameApi';
@@ -102,6 +103,12 @@ export default function GamePage() {
 				<h1 className="text-3xl font-bold">
 					{game.mode === 'pvp' ? 'PvP Tic-Tac-Toe' : 'AI Tic-Tac-Toe'}
 				</h1>
+				<ModeToggle
+					currentMode={game.mode}
+					onSelectMode={(mode) => {
+						router.push(mode === 'pvp' ? '/x' : '/');
+					}}
+				/>
 				<GameStatus
 					status={game.status}
 					isAiThinking={isAiThinking}
