@@ -190,3 +190,81 @@ Started: Fri Feb 27 15:47:49 PST 2026
   - NewGameButton navigates back to `/` (AI) or `/x` (PvP) depending on game mode
   - Error handling: check for '404' in error message for game-not-found, show generic error for other failures
 ---
+
+## 2026-02-27 21:30 - US-013
+- Refactored AI mode landing page at / to create game via REST API and redirect to /game/[id]
+- Files changed:
+  - `apps/tictactoe/src/app/page.tsx` - Replaced local game state management with createGame('ai') API call + router.push() redirect; kept GameHistorySidebar visible during loading
+- **Learnings for future iterations:**
+  - Used `useRef` (creatingRef) to prevent double-creation in React StrictMode (useEffect fires twice in dev)
+  - The page is now much simpler: ~60 lines vs ~175 lines — just create game, store token, redirect
+  - Game history sidebar still uses the existing `useGameHistory` GraphQL hook — will be migrated to REST in US-023
+  - localStorage key format `playerToken-{gameId}` matches what /game/[id] page reads
+  - Error state includes a "Try Again" button that reloads the page to re-trigger game creation
+---
+
+## 2026-02-27 22:00 - US-014
+- Created PvP Player X page at /x that creates a PvP game and shows a shareable link for Player O
+- Files changed:
+  - `apps/tictactoe/src/app/x/page.tsx` - New 'use client' page: creates PvP game via createGame('pvp'), stores playerToken in localStorage, displays shareable /o?game={id} link with copy-to-clipboard, "Go to Game" button navigates to /game/{id}
+- **Learnings for future iterations:**
+  - Same `useRef` (creatingRef) pattern as page.tsx to prevent double-creation in React StrictMode
+  - `navigator.clipboard.writeText()` is used for copy-to-clipboard — show "Copied!" briefly with setTimeout (2 seconds)
+  - Share link uses `window.location.origin` for dynamic origin — wrapped in ternary for SSR safety (typeof window check)
+  - Prettier requires breaking long template literals across multiple lines when they contain ternary expressions
+  - The page has 3 states: loading (creating game), share link view (game created, showing link + "Go to Game"), and error state
+---
+
+## 2026-02-27 22:30 - US-015
+- Created PvP Player O page at /o that joins an existing PvP game via invite link
+- Files changed:
+  - `apps/tictactoe/src/app/o/page.tsx` - New 'use client' page: reads `game` query param via useSearchParams(), calls joinGame(), stores playerToken in localStorage, redirects to /game/{id}. Wrapped in Suspense boundary.
+- **Learnings for future iterations:**
+  - `useSearchParams()` requires a Suspense boundary in Next.js 14 app router — wrap content component in Suspense with a fallback
+  - To avoid ESLint `no-non-null-assertion` warning, capture nullable value in a local const after the null check (e.g., `const id = gameId;`) and use that in the async function instead of `gameId!`
+  - Prettier collapses single-line strings — don't wrap short string arguments across multiple lines with `setError(\n...\n)`, keep them on one line
+  - Same `useRef` (joiningRef) pattern as page.tsx and /x to prevent double API calls in React StrictMode
+  - Error handling parses API error messages for status codes (409=already joined, 404=not found, 400=not PvP) to show user-friendly messages
+---
+
+## 2026-02-27 23:00 - US-016
+- Removed frontend AI pipeline and old game logic, cleaned up dependencies
+- Files changed:
+  - `apps/tictactoe/src/app/api/ai-move/route.ts` - Deleted (Next.js AI route handler, no longer needed)
+  - `apps/tictactoe/src/lib/ai/` - Deleted entire directory (6 files: graphState.ts, llm.ts, moveGraph.ts, movePrompt.ts, moveValidator.ts, nodes.ts)
+  - `apps/tictactoe/src/lib/game/gameLogic.ts` - Deleted (pure game logic, now lives in backend at apps/tictactoe-api/src/lib/game/gameLogic.ts)
+  - `apps/tictactoe/package.json` - Removed @langchain/aws, @langchain/core, @langchain/langgraph, zod; added socket.io-client
+  - `pnpm-lock.yaml` - Updated after dependency changes
+- **Learnings for future iterations:**
+  - No surviving files imported from `@/lib/ai/` or `@/lib/game/gameLogic` — all references were contained within the deleted files themselves
+  - The `@/types/game` types file is NOT deleted — it's still used by components (Cell, GameBoard, GameStatus, GameHistoryItem), API client (gameApi.ts), and GraphQL transforms
+  - Empty directories (app/api/, lib/game/) were cleaned up after file deletion
+  - Frontend build size decreased significantly after removing heavy langchain dependencies
+  - socket.io-client added now for US-020 (frontend WebSocket hook) — best to add it when removing deps to keep the package.json change atomic
+---
+
+## 2026-02-27 23:30 - US-017
+- Updated GameStatus component to support AI and PvP mode-specific messages
+- Files changed:
+  - `apps/tictactoe/src/components/GameStatus.tsx` - Added mode, playerSide, and currentTurn props to interface; created separate aiMessages and pvpMessages Records; branches on mode to select message set
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Passes mode and currentTurn from game state to GameStatus component
+- **Learnings for future iterations:**
+  - GameStatus props: mode (default 'ai'), playerSide (optional, for future personalization), currentTurn (default 'X') — backward compatible since all new props have defaults
+  - PvP in_progress uses `currentTurn` for "X's turn" / "O's turn" messages; `playerSide` is in the interface for future "Your turn" personalization but not actively used yet
+  - AI mode messages unchanged: 'Your turn (X)', 'You win!', 'AI wins!', 'It is a draw!'
+  - PvP mode messages: "{currentTurn}'s turn", 'X wins!', 'O wins!', 'It is a draw!'
+  - The `playerSide` prop is accepted but not destructured to avoid ESLint unused variable warnings — consumers can pass it and it will be available when needed
+---
+
+## 2026-02-27 24:00 - US-018
+- Added Redis service to Docker infrastructure for Socket.IO adapter (used in US-019)
+- Files changed:
+  - `apps/tictactoe-api/docker-compose.yml` - Added redis service: redis:7-alpine, container tictactoe-redis, port 6379:6379, restart unless-stopped
+  - `apps/tictactoe-api/.env.local` - Added REDIS_HOST=localhost and REDIS_PORT=6379
+  - `apps/tictactoe-api/.env.example` - Added REDIS_HOST=localhost and REDIS_PORT=6379
+- **Learnings for future iterations:**
+  - Redis alpine image is ~30MB — pulls quickly
+  - No application code changes needed for this story — purely infrastructure
+  - Redis accessible at localhost:6379, verified via `docker exec tictactoe-redis redis-cli ping` → PONG
+  - docker-compose up -d starts both PostgreSQL and Redis containers successfully
+---

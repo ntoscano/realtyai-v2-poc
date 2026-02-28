@@ -225,7 +225,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 13,
-			"passes": false,
+			"passes": true,
 			"notes": "This replaces the current page.tsx which manages game state locally. The new version is much simpler — just creates a game and redirects."
 		},
 		{
@@ -243,7 +243,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 14,
-			"passes": false,
+			"passes": true,
 			"notes": "Use navigator.clipboard.writeText() for copy. Show a 'Copied!' confirmation briefly."
 		},
 		{
@@ -262,7 +262,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 15,
-			"passes": false,
+			"passes": true,
 			"notes": "Wrap in Suspense boundary since useSearchParams() requires it in Next.js 14 app router."
 		},
 		{
@@ -281,7 +281,7 @@
 				"App builds successfully: pnpm build (from apps/tictactoe)"
 			],
 			"priority": 16,
-			"passes": false,
+			"passes": true,
 			"notes": "Only safe to do after US-012 and US-013 are complete (new pages don't reference old game logic or AI pipeline). Check for any remaining imports of @/lib/ai/ or @/lib/game/gameLogic."
 		},
 		{
@@ -297,7 +297,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 17,
-			"passes": false,
+			"passes": true,
 			"notes": "File: apps/tictactoe/src/components/GameStatus.tsx. Add mode and playerSide to the props interface. Keep the Record<GameStatus, ...> pattern but branch on mode."
 		},
 		{
@@ -311,7 +311,7 @@
 				"Redis accessible at localhost:6379"
 			],
 			"priority": 18,
-			"passes": false,
+			"passes": true,
 			"notes": "Simple docker-compose addition. No application code changes — just infra. Redis alpine image is ~30MB."
 		},
 		{
