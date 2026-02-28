@@ -1,262 +1,406 @@
 {
-	"project": "AI TicTacToe",
-	"branchName": "ralph/ai-tictactoe",
-	"description": "AI Tic-Tac-Toe Game - Play against an LLM-powered AI opponent (DeepSeek-R1 via AWS Bedrock) with game history persistence via PostgreSQL and PostGraphile GraphQL",
+	"project": "Secure TicTacToe",
+	"branchName": "ralph/secure-tictactoe-refactor",
+	"description": "Move game business logic to NestJS backend, add 2-player PvP mode with WebSocket real-time updates, restrict PostGraphile to read-only, make frontend a thin client",
 	"userStories": [
 		{
 			"id": "US-001",
-			"title": "Create backend project scaffolding",
-			"description": "As a developer, I need the basic NestJS project structure so I can start building the tictactoe API.",
+			"title": "Database schema migration for game mode and turn tracking",
+			"description": "As a developer, I need the game table to support game mode, turn tracking, and player identity so the backend can enforce game rules.",
 			"acceptanceCriteria": [
-				"Create apps/tictactoe-api/package.json with NestJS 8.x dependencies (mirror apps/realty-ai-api/package.json but remove @aws-sdk/client-bedrock-runtime and embedding-related deps)",
-				"Include scripts: dev (nest start --watch), build (nest build), start, docker:up, docker:down, typeorm:migration:new, typeorm:migration:run, migration, seed, typecheck",
-				"Create apps/tictactoe-api/tsconfig.json matching realty-ai-api/tsconfig.json",
-				"Create apps/tictactoe-api/tsconfig.build.json for NestJS CLI",
-				"Create apps/tictactoe-api/nest-cli.json matching realty-ai-api/nest-cli.json",
-				"Create apps/tictactoe-api/.eslintrc.js with root: true for NestJS decorator support (same pattern as realty-ai-api)",
-				"Create apps/tictactoe-api/docker-compose.yml with postgres:16 image on port 54322, db name 'tictactoe', credentials postgres/docker, volume tictactoe_pgdata",
-				"Create apps/tictactoe-api/.env.local with PORT=3002, POSTGRES_HOST=localhost, POSTGRES_PORT=54322, POSTGRES_USER=postgres, POSTGRES_PASSWORD=docker, POSTGRES_DB=tictactoe, GRAPHQL_ENDPOINT=/graphql, GRAPHIQL_ENABLED=true",
-				"Create apps/tictactoe-api/.env.example matching .env.local structure",
-				"Add apps/tictactoe-api to root .prettierignore and .eslintrc.js ignorePatterns",
-				"pnpm install succeeds from monorepo root",
+				"Truncate existing game data (fresh start for dev environment)",
+				"New TypeORM migration adds columns: mode (varchar(10), default 'ai'), current_turn (varchar(1), default 'X'), player_x_token (uuid, nullable), player_o_token (uuid, nullable)",
+				"game.entity.ts updated with new columns: mode typed as 'ai' | 'pvp', currentTurn typed as 'X' | 'O', playerXToken typed as string | null, playerOToken typed as string | null",
+				"Migration runs successfully: pnpm typeorm:migration:run",
 				"Typecheck passes"
 			],
 			"priority": 1,
 			"passes": true,
-			"notes": "Mirror realty-ai-api scaffolding. Root eslint/prettier configs don't support decorators - must add to ignorePatterns. NestJS CLI requires tsconfig.build.json."
+			"notes": "Entity file: apps/tictactoe-api/src/modules/game/game.entity.ts. Use SnakeNamingStrategy (camelCase in TS -> snake_case in DB). Truncate via migration up() before ALTER TABLE."
 		},
 		{
 			"id": "US-002",
-			"title": "Create backend database configuration",
-			"description": "As a developer, I need database configuration utilities so TypeORM and PostGraphile can connect to PostgreSQL.",
+			"title": "Copy game logic and shared types to backend",
+			"description": "As a developer, I need the pure game logic functions available in the backend so GameService can validate moves and compute state transitions.",
 			"acceptanceCriteria": [
-				"Create src/config/postgres.ts with getConfig(), getAdminConfig(), getClient() functions (mirror realty-ai-api/src/config/postgres.ts but default port 54322 and db 'tictactoe')",
-				"Create src/config/typeorm.ts with getTypeOrmConfig() and getTypeOrmModuleConfig() using SnakeNamingStrategy (mirror realty-ai-api/src/config/typeorm.ts, include dotenv loading)",
-				"Create src/config/graphile.ts with postgraphileConfigFactory() (identical to realty-ai-api/src/config/graphile.ts)",
-				"Create src/config/entities.ts exporting empty entities array (will be populated when entity is created)",
-				"Configuration reads from environment variables with correct defaults",
+				"Create apps/tictactoe-api/src/lib/game/types.ts with shared types: CellValue ('X' | 'O' | null), Board (9-element tuple), GameStatus ('in_progress' | 'x_wins' | 'o_wins' | 'draw'), GameMove ({position, player, moveNumber}), GameMode ('ai' | 'pvp')",
+				"Create apps/tictactoe-api/src/lib/game/gameLogic.ts copied verbatim from apps/tictactoe/src/lib/game/gameLogic.ts",
+				"Update imports in gameLogic.ts to use co-located types.ts instead of @/types/game",
+				"All pure functions available: checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay",
 				"Typecheck passes"
 			],
 			"priority": 2,
 			"passes": true,
-			"notes": "TypeORM 0.3.x uses DataSource. typeorm.ts needs dotenv.config() with explicit path for CLI operations. Export default DataSource for CLI and getTypeOrmModuleConfig() for NestJS."
+			"notes": "Source: apps/tictactoe/src/lib/game/gameLogic.ts and apps/tictactoe/src/types/game.ts. Functions are pure with zero framework dependencies — only import path changes needed."
 		},
 		{
 			"id": "US-003",
-			"title": "Create Game entity",
-			"description": "As a developer, I need a Game entity so TypeORM can manage the game table schema.",
+			"title": "Create GameModule with create game REST endpoint",
+			"description": "As a frontend client, I want to create a new game via POST /api/games so the backend initializes and tracks the game.",
 			"acceptanceCriteria": [
-				"Create src/modules/game/game.entity.ts with TypeORM entity decorators",
-				"Entity has columns: id (uuid PK via uuid_generate_v4), board_state (jsonb, default array of 9 nulls), status (varchar(20), default 'in_progress'), winner (varchar(1), nullable), moves (jsonb, default empty array), created_at (timestamp), updated_at (timestamp)",
-				"Export CellValue type ('X' | 'O' | null), GameMove interface ({position, player, moveNumber}), GameStatus type",
-				"Update src/config/entities.ts to include Game entity in the exports array",
+				"Create apps/tictactoe-api/src/modules/game/dto/create-game.dto.ts with mode field ('ai' | 'pvp')",
+				"Create apps/tictactoe-api/src/modules/game/dto/game-state.dto.ts with fields: id, board, status, winner, moves, mode, currentTurn, createdAt, updatedAt",
+				"Create apps/tictactoe-api/src/modules/game/game.service.ts with createGame() method",
+				"Create apps/tictactoe-api/src/modules/game/game.controller.ts with POST /api/games endpoint",
+				"Create apps/tictactoe-api/src/modules/game/game.module.ts importing TypeOrmModule.forFeature([Game])",
+				"Register GameModule in AppModule imports",
+				"POST /api/games accepts { mode: 'ai' | 'pvp' } body",
+				"Creates game in DB: empty board, status in_progress, current_turn X, mode from request",
+				"Generates and stores player_x_token (UUID v4) for the creating player",
+				"Returns GameStateDto with game state plus playerToken field",
+				"Returns 400 for invalid mode values",
 				"Typecheck passes"
 			],
 			"priority": 3,
 			"passes": true,
-			"notes": "Follow Property entity pattern from realty-ai-api/src/modules/property/property.entity.ts. Use @CreateDateColumn and @UpdateDateColumn for timestamps. JSONB columns with typed interfaces."
+			"notes": "Use @Controller('api/games') prefix. Use TypeORM Repository<Game> injected via constructor. Generate UUID with crypto.randomUUID() or uuid package. Do NOT expose player tokens in GameStateDto — return playerToken as a separate top-level field in the response."
 		},
 		{
 			"id": "US-004",
-			"title": "Create NestJS application bootstrap",
-			"description": "As a developer, I need the main application entry point so the API can start and serve requests.",
+			"title": "Get game state REST endpoint",
+			"description": "As a frontend client, I want to fetch the current game state via GET /api/games/:id so I can render the board.",
 			"acceptanceCriteria": [
-				"Create src/app.service.ts with getRoot() returning {message: 'TicTacToe API'} and getHealth() returning {status: 'ok'}",
-				"Create src/app.controller.ts with GET / and GET /health endpoints",
-				"Create src/app.module.ts importing TypeOrmModule.forRoot(getTypeOrmModuleConfig()) and PostGraphileModule.forRootAsync()",
-				"Create src/main.ts bootstrapping NestJS on port 3002 with dotenv loading from .env.local",
+				"GET /api/games/:id returns GameStateDto with id, board, status, winner, moves, mode, currentTurn, createdAt, updatedAt",
+				"Returns 404 with descriptive message for non-existent game IDs",
+				"Does NOT expose playerXToken or playerOToken in the response",
 				"Typecheck passes"
 			],
 			"priority": 4,
 			"passes": true,
-			"notes": "Use dotenv.config() with path.join(__dirname, '../.env.local') in main.ts. PostGraphileModule uses postgraphile-nest package with forRootAsync() and factory function from graphile.ts."
+			"notes": "Add getGame() method to GameService and @Get(':id') to GameController. Use repository.findOne({ where: { id } }) with NotFoundException."
 		},
 		{
 			"id": "US-005",
-			"title": "Create database migration and seed data",
-			"description": "As a developer, I need the database schema created and sample data seeded so PostGraphile can generate the GraphQL API.",
+			"title": "Make move REST endpoint (core game logic)",
+			"description": "As a player, I want to submit a move via POST /api/games/:id/move so the backend validates and applies it.",
 			"acceptanceCriteria": [
-				"Start Docker with pnpm docker:up successfully",
-				"Create uuid-ossp extension in the tictactoe database",
-				"Generate TypeORM migration from Game entity using pnpm typeorm:migration:new",
-				"Migration creates 'game' table with all columns matching entity definition",
-				"pnpm typeorm:migration:run executes successfully",
-				"Create src/cli/seed.ts that inserts 2 sample completed games (one x_wins, one draw) with realistic board_state and moves arrays",
-				"Create src/cli/migration.ts as cleanup utility placeholder",
-				"pnpm seed runs successfully and data appears in database",
+				"Create apps/tictactoe-api/src/modules/game/dto/make-move.dto.ts with position field (number 0-8)",
+				"POST /api/games/:id/move accepts { position: number } body",
+				"Loads game from DB using TypeORM query runner with SELECT ... FOR UPDATE for concurrency safety",
+				"Rejects with 400 if game is not in_progress",
+				"Rejects with 400 if position is invalid via isValidMove(board, position)",
+				"Applies move via applyMove(board, position, currentTurn)",
+				"Records move in moves array: { position, player: currentTurn, moveNumber }",
+				"Checks game status via getGameStatus(newBoard)",
+				"If game over: updates status and winner, saves, returns final GameStateDto",
+				"If game continues: flips currentTurn (X->O or O->X), saves, returns updated GameStateDto",
+				"Returns 404 for non-existent game ID",
 				"Typecheck passes"
 			],
 			"priority": 5,
 			"passes": true,
-			"notes": "uuid-ossp extension needs superuser privileges. TypeORM migration:generate requires -d src/config/typeorm.ts flag. Seed script needs dotenv loading and --project tsconfig.json flag."
+			"notes": "Use TypeORM EntityManager.transaction() with queryRunner for SELECT ... FOR UPDATE. Import game logic functions from src/lib/game/gameLogic. Board is stored as JSONB — cast to Board type. AI integration and token validation are separate stories."
 		},
 		{
 			"id": "US-006",
-			"title": "Verify PostGraphile GraphQL API",
-			"description": "As a developer, I need to verify the auto-generated GraphQL API works correctly before building the frontend.",
+			"title": "List games REST endpoint",
+			"description": "As a frontend client, I want to list recent games via GET /api/games so I can display game history.",
 			"acceptanceCriteria": [
-				"pnpm dev starts backend on port 3002 without errors",
-				"GraphiQL accessible at http://localhost:3002/graphql",
-				"allGames query returns seeded games with fields: id, boardState, status, winner, moves, createdAt (PostGraphile converts snake_case to camelCase)",
-				"createGame mutation creates a new game record with default board_state and status",
-				"updateGameById mutation can update boardState, status, winner, and moves fields",
-				"CORS is enabled for cross-origin requests",
+				"GET /api/games returns array of GameStateDto ordered by createdAt descending",
+				"Supports optional ?limit=N query param (default 20)",
+				"Does NOT expose player tokens in response objects",
 				"Typecheck passes"
 			],
 			"priority": 6,
 			"passes": true,
-			"notes": "PostGraphile auto-generates CRUD from tables. Uses connection pattern: allGames { nodes { ... } }. JSONB columns accept JSON directly through GraphQL. Verify exact mutation input types in GraphiQL."
+			"notes": "Use repository.find({ order: { createdAt: 'DESC' }, take: limit }). Add @Get() with @Query('limit') param to GameController."
 		},
 		{
 			"id": "US-007",
-			"title": "Create frontend project scaffolding",
-			"description": "As a developer, I need the Next.js frontend app set up with Tailwind and build tooling.",
+			"title": "Join PvP game REST endpoint",
+			"description": "As Player O, I want to join an existing PvP game via POST /api/games/:id/join so I receive my player token.",
 			"acceptanceCriteria": [
-				"Create apps/tictactoe/package.json with Next.js 14, React 18, Tailwind, LangChain, Apollo Client, shadcn/ui dependencies (mirror realty-ai/package.json, remove weather/promptfoo deps)",
-				"Dev script runs on port 2025",
-				"Create apps/tictactoe/tsconfig.json extending @boilertowns-example/tsconfig/web.json with @/* path alias",
-				"Create apps/tictactoe/next.config.js (copy from realty-ai)",
-				"Create apps/tictactoe/postcss.config.js (copy from realty-ai)",
-				"Create apps/tictactoe/tailwind.config.ts (copy from realty-ai)",
-				"Create apps/tictactoe/.env.local with AI_AWS_BEDROCK_* credentials and NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3002/graphql",
-				"pnpm install succeeds from monorepo root",
+				"POST /api/games/:id/join generates and stores player_o_token (UUID v4)",
+				"Returns GameStateDto plus playerToken field for Player O",
+				"Rejects with 400 if game mode is not pvp",
+				"Rejects with 409 Conflict if Player O has already joined (playerOToken is not null)",
+				"Returns 404 for non-existent game ID",
 				"Typecheck passes"
 			],
 			"priority": 7,
 			"passes": true,
-			"notes": "Copy .env.local Bedrock credentials from realty-ai/.env.local. Dependencies needed: @langchain/aws, @langchain/core, @langchain/langgraph, @apollo/client, graphql, zod, tailwindcss, class-variance-authority, clsx, tailwind-merge, lucide-react, @radix-ui/react-scroll-area, @radix-ui/react-slot."
+			"notes": "Add joinGame() to GameService and @Post(':id/join') to GameController."
 		},
 		{
 			"id": "US-008",
-			"title": "Create frontend base files and UI components",
-			"description": "As a developer, I need the base layout, styles, and shared UI components so I can build the game interface.",
+			"title": "Migrate AI pipeline to backend",
+			"description": "As a developer, I need the LangGraph AI pipeline running in the NestJS backend so GameService can trigger it after validating a human move.",
 			"acceptanceCriteria": [
-				"Create src/app/globals.css (copy from realty-ai/src/app/globals.css)",
-				"Create src/app/layout.tsx with metadata title 'AI Tic-Tac-Toe' and basic html/body wrapper with Tailwind classes",
-				"Create src/lib/utils.ts with cn() utility using clsx + tailwind-merge (copy from realty-ai)",
-				"Copy shadcn/ui components from realty-ai/src/components/ui/ to src/components/ui/: button.tsx, card.tsx, badge.tsx, scroll-area.tsx",
-				"pnpm dev starts on port 2025 without errors",
+				"Install LangGraph dependencies in tictactoe-api: @langchain/aws, @langchain/core, @langchain/langgraph, zod",
+				"Create apps/tictactoe-api/src/modules/ai/ai.module.ts exporting AiModule",
+				"Create apps/tictactoe-api/src/modules/ai/ai.service.ts with generateMove(board: Board): Promise<number>",
+				"Copy AI files from apps/tictactoe/src/lib/ai/ to apps/tictactoe-api/src/modules/ai/: move-graph.ts, nodes.ts, graph-state.ts, move-validator.ts, llm.ts, move-prompt.ts",
+				"Update all imports in copied AI files: replace @/lib/game/gameLogic with ../../lib/game/gameLogic, replace @/types/game with ../../lib/game/types",
+				"AiService.generateMove() invokes moveGraph.invoke({ board }), validates result with isValidMove() defense-in-depth check, returns position",
+				"Add AI_AWS_BEDROCK_ACCESS_KEY_ID, AI_AWS_BEDROCK_SECRET_ACCESS_KEY, AI_AWS_BEDROCK_REGION to apps/tictactoe-api/.env.local and .env.example",
+				"AiModule imported by GameModule",
 				"Typecheck passes"
 			],
 			"priority": 8,
 			"passes": true,
-			"notes": "These are self-contained shadcn/ui components with no project-specific logic. Direct copy from realty-ai."
+			"notes": "Source files: apps/tictactoe/src/lib/ai/moveGraph.ts, nodes.ts, graphState.ts, moveValidator.ts, llm.ts, movePrompt.ts. Zod v4 .refine() second arg must be string or { message: string }, not function. DeepSeek-R1 uses <think>...</think> tags. llm.ts maxTokens is 2048."
 		},
 		{
 			"id": "US-009",
-			"title": "Create game types and deterministic game logic",
-			"description": "As a developer, I need TypeScript types and pure functions for tic-tac-toe rules enforced deterministically without the LLM.",
+			"title": "AI move integration in make-move endpoint",
+			"description": "As a player in AI mode, after I submit my move the backend should automatically trigger the AI pipeline and include the AI counter-move in the response.",
 			"acceptanceCriteria": [
-				"Create src/types/game.ts defining: CellValue ('X' | 'O' | null), Board (9-element tuple of CellValue), GameMove ({position: number, player: 'X'|'O', moveNumber: number}), GameStatus ('in_progress'|'x_wins'|'o_wins'|'draw'), GameState ({id, board, status, winner, moves, isAiThinking}), GameSummary ({id, status, winner, moveCount, createdAt})",
-				"Create src/lib/game/gameLogic.ts with pure functions: checkWinner(board) checks all 8 win lines, isBoardFull(board), getAvailablePositions(board), getGameStatus(board), getCurrentTurn(board) based on X/O count, isValidMove(board, position), applyMove(board, position, player) returns new board immutably, createEmptyBoard() returns 9 nulls, formatBoardForDisplay(board) returns text grid for LLM prompt",
-				"WIN_LINES constant defines all 8 winning combinations: [0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]",
-				"All functions are pure with no side effects",
+				"In GameService.makeMove(): after applying human move in AI mode, if game is still in_progress, call AiService.generateMove(newBoard)",
+				"AI move is applied to the board via applyMove(board, aiPosition, 'O')",
+				"AI move recorded in moves array with correct moveNumber",
+				"Game status rechecked after AI move — update status/winner if AI wins or draws",
+				"currentTurn flips back to X after AI move (or stays on final status if game ends)",
+				"Response includes both human and AI moves in the moves array",
+				"Returns 500 with descriptive error if AI pipeline fails after retries",
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": true,
-			"notes": "Board is a flat 9-element array. Indices 0-8 map left-to-right, top-to-bottom. X always goes first. formatBoardForDisplay shows '.' for empty, 'X'/'O' for played cells in a 3x3 text grid."
+			"passes": false,
+			"notes": "Inject AiService into GameService. AI always plays O. The response bundles both moves so frontend gets complete state in one round trip."
 		},
 		{
 			"id": "US-010",
-			"title": "Create LangGraph AI move pipeline",
-			"description": "As a developer, I need a LangGraph pipeline that sends board state to AWS Bedrock and returns the AI's chosen move with validation and retries.",
+			"title": "PvP player token validation in make-move endpoint",
+			"description": "As the backend, I need to validate that the player making a move in PvP mode is the correct player for the current turn.",
 			"acceptanceCriteria": [
-				"Create src/lib/ai/llm.ts with ChatBedrockConverse instance (model: 'us.deepseek.r1-v1:0', temp 0.7, maxTokens 256, credentials from AI_AWS_BEDROCK_* env vars) - same pattern as realty-ai/src/lib/ai/llm.ts",
-				"Create src/lib/ai/movePrompt.ts with ChatPromptTemplate: system message tells AI it plays O and must respond with ONLY a number 0-8; user message shows board display and available positions",
-				"Create src/lib/ai/moveValidator.ts with: Zod schema validating position is integer 0-8 and in available positions; parseMoveResponse() strips <think>...</think> tags and extracts first digit 0-8",
-				"Create src/lib/ai/graphState.ts with Annotation.Root defining: board, available_positions, board_display, ai_move",
-				"Create src/lib/ai/nodes.ts with 3 node functions: inputValidationNode (validates board, computes available positions, formats display), moveGenerationNode (invokes LLM with up to 3 retries, includes error feedback on retry), moveValidationNode (final legality check)",
-				"Create src/lib/ai/moveGraph.ts compiling StateGraph: START -> inputValidation -> moveGeneration -> moveValidation -> END",
+				"In PvP mode, POST /api/games/:id/move requires X-Player-Token header",
+				"If currentTurn is X, token must match game's playerXToken",
+				"If currentTurn is O, token must match game's playerOToken",
+				"Returns 403 Forbidden if token is missing or does not match",
+				"AI mode does not require token validation (human is always X)",
 				"Typecheck passes"
 			],
 			"priority": 10,
-			"passes": true,
-			"notes": "Follow patterns from realty-ai/src/lib/ai/emailGraph.ts (StateGraph), nodes.ts (retry logic with MAX_GENERATION_ATTEMPTS=3), graphState.ts (Annotation.Root). DeepSeek-R1 wraps reasoning in <think>...</think> tags that must be stripped before parsing. Response content may be string or array of content blocks."
+			"passes": false,
+			"notes": "Read token from request headers: @Headers('x-player-token') in controller, pass to service. Add token param to makeMove() service method."
 		},
 		{
 			"id": "US-011",
-			"title": "Create AI move API route",
-			"description": "As a user, when I make a move the frontend needs an API endpoint to request the AI's response.",
+			"title": "Frontend REST API client",
+			"description": "As a frontend developer, I need a fetch-based API client to replace direct game logic calls with backend REST calls.",
 			"acceptanceCriteria": [
-				"Create src/app/api/ai-move/route.ts handling POST requests",
-				"Accepts JSON body: { board: CellValue[] }",
-				"Validates board is a 9-element array with valid values (null, 'X', 'O')",
-				"Returns 400 if game is already over (status !== 'in_progress')",
-				"Returns 400 for malformed JSON",
-				"Invokes moveGraph.invoke({ board }) and returns { position: number, board: CellValue[] }",
-				"Double-checks returned move is valid before responding (defense in depth)",
-				"Returns 500 with error message if LLM invocation fails after retries",
+				"Create apps/tictactoe/src/lib/api/gameApi.ts",
+				"Export functions: createGame(mode: 'ai' | 'pvp'), getGame(id: string), makeMove(gameId: string, position: number, playerToken?: string), joinGame(gameId: string), listGames(limit?: number)",
+				"Uses NEXT_PUBLIC_API_URL env var (default http://localhost:3002)",
+				"Includes X-Player-Token header when playerToken is provided",
+				"Each function throws descriptive Error on non-ok responses (include status code and response text)",
+				"All functions return typed response data (GameStateDto or array)",
 				"Typecheck passes"
 			],
 			"priority": 11,
-			"passes": true,
-			"notes": "Follow pattern from realty-ai/src/app/api/generate-email/route.ts. Import game logic functions for validation. Apply AI move to board before returning updated board in response."
+			"passes": false,
+			"notes": "Simple fetch wrappers. No Apollo Client — these are REST endpoints, not GraphQL. Add NEXT_PUBLIC_API_URL=http://localhost:3002 to apps/tictactoe/.env.local."
 		},
 		{
 			"id": "US-012",
-			"title": "Create GraphQL integration layer",
-			"description": "As a developer, I need Apollo Client and GraphQL queries/mutations so the frontend can persist and fetch game data.",
+			"title": "Unified game board page at /game/[id]",
+			"description": "As a player, I want a /game/:id page that loads the game by ID, renders the board, and handles moves via the REST API.",
 			"acceptanceCriteria": [
-				"Create src/lib/graphql/client.ts with Apollo Client pointing to NEXT_PUBLIC_GRAPHQL_URL (default http://localhost:3002/graphql), cache-and-network for watchQuery, network-only for query",
-				"Create src/lib/graphql/queries.ts with GET_ALL_GAMES (orderBy: CREATED_AT_DESC, fields: id, boardState, status, winner, moves, createdAt) and GET_GAME_BY_ID",
-				"Create src/lib/graphql/mutations.ts with CREATE_GAME and UPDATE_GAME mutations using PostGraphile's auto-generated input types",
-				"Create src/lib/graphql/transforms.ts with transformGameToSummary() converting GraphQL node to GameSummary type",
-				"Create src/lib/graphql/hooks.ts with useGameHistory() hook: fetches all games on mount, returns {games, loading, error, refetch}",
-				"Typecheck passes"
+				"Create apps/tictactoe/src/app/game/[id]/page.tsx as 'use client' component",
+				"On mount: fetches game state via getGame(params.id) from gameApi",
+				"Renders GameBoard, GameStatus, NewGameButton components using fetched game state",
+				"On cell click: calls makeMove(gameId, position, playerToken) from gameApi, updates local state from response",
+				"In AI mode: shows isAiThinking spinner while makeMove request is in-flight (response includes AI counter-move)",
+				"Reads playerToken from localStorage keyed by gameId",
+				"Handles error states: game not found (404), invalid move (400 with message), server error (500)",
+				"Displays error message to user on failed moves without crashing",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill"
 			],
 			"priority": 12,
-			"passes": true,
-			"notes": "PostGraphile converts snake_case to camelCase in GraphQL (board_state -> boardState). Auto-generated types: CreateGameInput has game: {...} wrapper, UpdateGameByIdInput has id + gamePatch: {...}. Follow pattern from realty-ai/src/lib/graphql/. Apollo Client uses typed generics for TypeScript safety."
+			"passes": false,
+			"notes": "Use existing GameBoard, GameStatus, NewGameButton, Cell components. State shape similar to current page.tsx but driven by API responses instead of local game logic. localStorage key format: playerToken-{gameId}."
 		},
 		{
 			"id": "US-013",
-			"title": "Create game board UI components",
-			"description": "As a user, I want to see a 3x3 tic-tac-toe board and click cells to place my X.",
+			"title": "AI mode landing page refactor",
+			"description": "As a player visiting /, I want to immediately start a game against the AI.",
 			"acceptanceCriteria": [
-				"Create src/components/Cell.tsx: clickable button (96x96px) showing X (primary color), O (destructive/red color), or empty; hover state on clickable empty cells; disabled when occupied, game over, or AI thinking",
-				"Create src/components/GameBoard.tsx: 3x3 grid of Cell components with visible borders; passes onCellClick(position) callback to cells",
-				"Create src/components/GameStatus.tsx: shows contextual messages - 'Your turn (X)', 'AI is thinking...' (with animate-pulse), 'You win!' (primary color), 'AI wins!' (destructive color), 'It is a draw!'",
-				"Create src/components/NewGameButton.tsx: outline button that calls onClick to reset game state; always visible",
+				"Refactor apps/tictactoe/src/app/page.tsx: on load calls createGame('ai') from gameApi",
+				"Stores returned playerToken in localStorage keyed by gameId",
+				"Redirects to /game/{id} using next/navigation router.push()",
+				"Game history sidebar remains visible (uses listGames() from gameApi or existing useGameHistory hook)",
+				"Shows loading state while creating game",
 				"Typecheck passes",
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 13,
-			"passes": true,
-			"notes": "Use cn() from lib/utils for conditional classNames. Import Button from components/ui/button. Cell uses Tailwind classes for sizing and colors. GameBoard uses CSS grid (grid-cols-3)."
+			"passes": false,
+			"notes": "This replaces the current page.tsx which manages game state locally. The new version is much simpler — just creates a game and redirects."
 		},
 		{
 			"id": "US-014",
-			"title": "Create game history sidebar components",
-			"description": "As a user, I want to see a sidebar showing my past games with results.",
+			"title": "PvP Player X page at /x",
+			"description": "As Player X, I want to visit /x to create a new PvP game and see a shareable link for Player O.",
 			"acceptanceCriteria": [
-				"Create src/components/GameHistoryItem.tsx: displays date/time (short format), move count, and result Badge (Win=default/green, Loss=destructive/red, Draw=secondary/gray)",
-				"Create src/components/GameHistorySidebar.tsx: Card with CardHeader 'Game History', CardContent with ScrollArea (max height ~400px) listing GameHistoryItems; shows 'Loading...' while fetching and 'No games played yet.' when empty",
+				"Create apps/tictactoe/src/app/x/page.tsx as 'use client' component",
+				"On load: calls createGame('pvp') from gameApi",
+				"Stores returned playerToken in localStorage keyed by gameId",
+				"Displays shareable link: /o?game={id} with copy-to-clipboard button",
+				"After showing link, navigates to /game/{id} (or renders board inline)",
+				"Shows loading state while creating game",
 				"Typecheck passes",
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 14,
-			"passes": true,
-			"notes": "Import Card, CardHeader, CardTitle, CardContent from components/ui/card. Import Badge from components/ui/badge. Import ScrollArea from components/ui/scroll-area. Date formatting: toLocaleDateString with month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'."
+			"passes": false,
+			"notes": "Use navigator.clipboard.writeText() for copy. Show a 'Copied!' confirmation briefly."
 		},
 		{
 			"id": "US-015",
-			"title": "Create main game page",
-			"description": "As a user, I want to play a complete game of tic-tac-toe against the AI with game history displayed alongside.",
+			"title": "PvP Player O page at /o",
+			"description": "As Player O, I want to visit /o?game={id} to join an existing PvP game.",
 			"acceptanceCriteria": [
-				"Create src/app/page.tsx as 'use client' component managing GameState via useState",
-				"handleCellClick(position): applies X immediately, checks win/draw, if game continues calls POST /api/ai-move, applies O response, checks win/draw again",
-				"On game end (win or draw): saves game to backend via createGame GraphQL mutation, refetches game history",
-				"If save fails, game still completes normally (error logged, not shown to user)",
-				"handleNewGame(): resets board to empty, clears error state",
-				"Error message displayed if AI move request fails; board remains in valid state",
-				"Layout: 2-column grid - game area with status/board/button centered (md:col-span-2), history sidebar (col-span-1)",
+				"Create apps/tictactoe/src/app/o/page.tsx as 'use client' component",
+				"Reads game query param from URL using useSearchParams()",
+				"Calls joinGame(gameId) from gameApi",
+				"Stores returned playerToken in localStorage keyed by gameId",
+				"Redirects to /game/{id} using router.push()",
+				"Shows error if no game param provided",
+				"Shows error if game not found or join fails (not PvP, already joined, etc.)",
 				"Typecheck passes",
-				"Verify in browser: play a full game to completion, verify history sidebar updates"
+				"Verify in browser using dev-browser skill"
 			],
 			"priority": 15,
-			"passes": true,
-			"notes": "Import all components, gameLogic functions, useGameHistory hook, apolloClient, and mutations. Game status checks after BOTH human and AI moves (human could win before AI plays). isAiThinking flag prevents clicks during API call. Frontend is source of truth for in-progress game; backend only receives completed games."
+			"passes": false,
+			"notes": "Wrap in Suspense boundary since useSearchParams() requires it in Next.js 14 app router."
+		},
+		{
+			"id": "US-016",
+			"title": "Remove frontend AI pipeline and old game logic",
+			"description": "As a developer, I need to remove the AI pipeline and direct game logic from the frontend since the backend is now the source of truth.",
+			"acceptanceCriteria": [
+				"Delete apps/tictactoe/src/app/api/ai-move/route.ts",
+				"Delete apps/tictactoe/src/lib/ai/ directory (all 6 files: moveGraph.ts, nodes.ts, graphState.ts, moveValidator.ts, llm.ts, movePrompt.ts)",
+				"Delete apps/tictactoe/src/lib/game/gameLogic.ts",
+				"Remove from frontend package.json: @langchain/aws, @langchain/core, @langchain/langgraph, zod",
+				"Add socket.io-client to frontend package.json",
+				"Update or remove any broken imports referencing deleted files",
+				"pnpm install succeeds",
+				"Typecheck passes",
+				"App builds successfully: pnpm build (from apps/tictactoe)"
+			],
+			"priority": 16,
+			"passes": false,
+			"notes": "Only safe to do after US-012 and US-013 are complete (new pages don't reference old game logic or AI pipeline). Check for any remaining imports of @/lib/ai/ or @/lib/game/gameLogic."
+		},
+		{
+			"id": "US-017",
+			"title": "GameStatus component mode support",
+			"description": "As a player, I want the game status display to adapt based on game mode (AI vs PvP).",
+			"acceptanceCriteria": [
+				"GameStatus component accepts mode prop ('ai' | 'pvp') and optional playerSide prop ('X' | 'O')",
+				"AI mode messages: 'Your turn (X)' / 'AI is thinking...' (animate-pulse) / 'You win!' / 'AI wins!' / 'It is a draw!'",
+				"PvP mode messages: 'X's turn' / 'O's turn' / 'X wins!' / 'O wins!' / 'It is a draw!'",
+				"Existing component interface remains backward-compatible (mode defaults to 'ai')",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill"
+			],
+			"priority": 17,
+			"passes": false,
+			"notes": "File: apps/tictactoe/src/components/GameStatus.tsx. Add mode and playerSide to the props interface. Keep the Record<GameStatus, ...> pattern but branch on mode."
+		},
+		{
+			"id": "US-018",
+			"title": "Add Redis to Docker infrastructure",
+			"description": "As a developer, I need Redis running locally via Docker so the Socket.IO adapter can use it for horizontal scaling.",
+			"acceptanceCriteria": [
+				"Add redis service to apps/tictactoe-api/docker-compose.yml: image redis:7-alpine, container_name tictactoe-redis, port mapping 6379:6379, restart unless-stopped",
+				"Add REDIS_HOST=localhost and REDIS_PORT=6379 to apps/tictactoe-api/.env.local and .env.example",
+				"docker-compose up -d starts both PostgreSQL and Redis containers",
+				"Redis accessible at localhost:6379"
+			],
+			"priority": 18,
+			"passes": false,
+			"notes": "Simple docker-compose addition. No application code changes — just infra. Redis alpine image is ~30MB."
+		},
+		{
+			"id": "US-019",
+			"title": "WebSocket gateway for PvP real-time updates",
+			"description": "As a PvP player, I want to see my opponent's moves in real-time without refreshing the page.",
+			"acceptanceCriteria": [
+				"Install in tictactoe-api: @nestjs/websockets, @nestjs/platform-socket.io, socket.io, @socket.io/redis-adapter, ioredis",
+				"Create apps/tictactoe-api/src/modules/game/game.gateway.ts with @WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })",
+				"Gateway configured with Redis adapter using REDIS_HOST and REDIS_PORT env vars",
+				"Gateway handles joinGame event: client joins Socket.IO room game-{gameId}",
+				"Gateway exposes broadcastGameUpdate(gameId, state) method",
+				"GameService calls gateway.broadcastGameUpdate() after each successful PvP move",
+				"Server emits gameUpdate event with GameStateDto to the game room",
+				"GameGateway registered as provider in GameModule",
+				"Typecheck passes"
+			],
+			"priority": 19,
+			"passes": false,
+			"notes": "NestJS 8 @WebSocketGateway is stable. Use @WebSocketServer() decorator for Server instance. Redis adapter: createAdapter(ioredis pub, ioredis sub). Inject GameGateway into GameService."
+		},
+		{
+			"id": "US-020",
+			"title": "Frontend WebSocket hook for PvP",
+			"description": "As a PvP player, my game page should connect to WebSocket and update the board when my opponent moves.",
+			"acceptanceCriteria": [
+				"Create apps/tictactoe/src/lib/api/useGameSocket.ts React hook",
+				"Hook accepts gameId (string | null), mode ('ai' | 'pvp'), and onUpdate callback",
+				"Connects to NEXT_PUBLIC_API_URL /game namespace only when mode is pvp and gameId is provided",
+				"Emits joinGame { gameId } on connect",
+				"Listens for gameUpdate events and calls onUpdate with new GameStateDto",
+				"Cleans up socket connection on unmount or when gameId changes",
+				"Does nothing when mode is ai (no socket connection)",
+				"Update /game/[id]/page.tsx to use useGameSocket in PvP mode — onUpdate replaces local game state",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill: open two tabs with same PvP game, make move in one, verify other updates"
+			],
+			"priority": 20,
+			"passes": false,
+			"notes": "Use socket.io-client: io(url + '/game', { transports: ['websocket'] }). Store socket in useRef. Cleanup in useEffect return."
+		},
+		{
+			"id": "US-021",
+			"title": "PostGraphile read-only security via PostgreSQL roles",
+			"description": "As a developer, I need PostGraphile restricted to read-only access so clients cannot bypass GameService by calling auto-generated mutations.",
+			"acceptanceCriteria": [
+				"Create new TypeORM migration that: creates postgraphile_user role with LOGIN and password, grants SELECT on game table, revokes INSERT/UPDATE/DELETE on game table",
+				"Update PostGraphile config (apps/tictactoe-api/src/config/graphile.ts) to connect with postgraphile_user credentials",
+				"TypeORM connection continues using postgres superuser for full read/write via GameService",
+				"Add POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD to .env.local and .env.example",
+				"allGames GraphQL query still works (returns game data)",
+				"createGame / updateGameById GraphQL mutations return permission denied error",
+				"Migration runs successfully",
+				"Typecheck passes"
+			],
+			"priority": 21,
+			"passes": false,
+			"notes": "Two DB connections: PostGraphile (read-only postgraphile_user role) and TypeORM (full-access postgres role). Migration SQL: CREATE ROLE postgraphile_user WITH LOGIN PASSWORD 'postgraphile'; GRANT SELECT ON game TO postgraphile_user;"
+		},
+		{
+			"id": "US-022",
+			"title": "Mode toggle UI",
+			"description": "As a player, I want a UI toggle to switch between AI and PvP modes without manually editing the URL.",
+			"acceptanceCriteria": [
+				"Toggle or button group visible on the game pages: 'Play vs AI' / 'Play vs Human'",
+				"Selecting 'Play vs AI' navigates to / (creates new AI game)",
+				"Selecting 'Play vs Human' navigates to /x (creates new PvP game)",
+				"Current mode visually highlighted based on game state",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill"
+			],
+			"priority": 22,
+			"passes": false,
+			"notes": "Can be a simple component with two Button variants (default vs outline). Place above or below the game board in /game/[id]/page.tsx."
+		},
+		{
+			"id": "US-023",
+			"title": "Game history sidebar with mode labels",
+			"description": "As a player, I want the game history sidebar to show whether each game was AI or PvP.",
+			"acceptanceCriteria": [
+				"GameHistoryItem component displays mode badge: 'AI' or 'PvP' using Badge component",
+				"Game history fetched via GET /api/games REST endpoint using listGames() from gameApi (replacing or supplementing PostGraphile query)",
+				"Mode badge uses secondary variant for AI, outline variant for PvP",
+				"Typecheck passes",
+				"Verify in browser using dev-browser skill"
+			],
+			"priority": 23,
+			"passes": false,
+			"notes": "File: apps/tictactoe/src/components/GameHistoryItem.tsx. The REST endpoint returns mode field. May need to update useGameHistory hook or create a new hook that uses gameApi.listGames()."
 		}
 	]
 }

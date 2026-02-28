@@ -1,227 +1,138 @@
-# Ralph Progress Log
-Started: Thu Feb 26 16:55:08 PST 2026
-
 ## Codebase Patterns
-- NestJS apps need `root: true` in `.eslintrc.js` and must be added to root `.prettierignore` and `.eslintrc.js` ignorePatterns (root config doesn't support decorators)
-- `.env.local` is gitignored by default - use `.env.example` for committed env template
-- TypeORM config uses `SnakeNamingStrategy` for PostgreSQL column naming conventions
-- Use `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` in CLI scripts and `'../.env.local'` in main.ts
-- Entity registry pattern: centralize all entities in `src/config/entities.ts`
-- PostGraphile auto-converts snake_case to camelCase in GraphQL (board_state -> boardState)
-- PostGraphile mutation input types: `CreateGameInput` has `game: {}` wrapper, `UpdateGameByIdInput` has `id` + `gamePatch: {...}`
-- JSONB columns accept JSON variables directly in PostGraphile mutations (use GraphQL variables, not inline objects)
-- Use `app.enableCors()` in NestJS main.ts for cross-origin frontend requests
-- Frontend port assignments: realty-ai=2024, tictactoe=2025; Backend: realty-ai-api=3001, tictactoe-api=3002
-- Next.js frontend apps need at least `src/app/page.tsx` and `src/app/layout.tsx` for typecheck to work
-- Zod v4 `.refine()` second arg must be string or `{ message: string }` object, NOT a function (differs from v3)
-- LangGraph pattern: Annotation.Root state → node functions returning Partial<State> → StateGraph with addNode/addEdge → compile
-- DeepSeek-R1 wraps reasoning in `<think>...</think>` tags - strip before parsing LLM output
+- Use SnakeNamingStrategy: camelCase in TypeScript -> snake_case in DB columns (automatic via TypeORM config)
+- Migrations are in `apps/tictactoe-api/src/migrations/` with timestamp prefix
+- Run migrations with `pnpm typeorm:migration:run` from `apps/tictactoe-api/`
+- PostgreSQL on port 54322 (not default 5432) to avoid conflicts
+- Game entity at `apps/tictactoe-api/src/modules/game/game.entity.ts`
+- Types (CellValue, GameMove, GameStatus, GameMode) are defined in the entity file AND in `apps/tictactoe-api/src/lib/game/types.ts`
+- Pure game logic functions in `apps/tictactoe-api/src/lib/game/gameLogic.ts` — import types from `./types`
+- Typecheck: `pnpm typecheck` from `apps/tictactoe-api/`
+- Pre-commit hooks run eslint and prettier via lint-staged
+- DTOs in `apps/tictactoe-api/src/modules/game/dto/` — use class-validator for validation
+- GameService has `toGameStateDto()` private method to map entity -> DTO (does NOT expose player tokens)
+- GameController uses `@Controller('api/games')` prefix
+- Use `@UsePipes(new ValidationPipe({ whitelist: true }))` per-endpoint for input validation
+- For transactional operations with row locking: inject `DataSource`, create queryRunner, use `setLock('pessimistic_write')` for SELECT FOR UPDATE
+- Board is JSONB in DB — cast to `Board` type from `../../lib/game/types` when passing to game logic functions
+- AI module at `apps/tictactoe-api/src/modules/ai/` — AiService.generateMove(board) invokes LangGraph pipeline
+- AI files use kebab-case filenames: move-graph.ts, graph-state.ts, move-validator.ts, move-prompt.ts, llm.ts, nodes.ts
+- NestJS upgraded to v10, TypeScript upgraded to v5.9 — required for compatibility with zod v4 (transitive dep from @langchain/core)
+- AWS Bedrock env vars: AI_AWS_BEDROCK_ACCESS_KEY_ID, AI_AWS_BEDROCK_SECRET_ACCESS_KEY, AI_AWS_BEDROCK_REGION
 
+# Ralph Progress Log
+Started: Fri Feb 27 15:47:49 PST 2026
 ---
 
-## 2026-02-26 - US-001
-- What was implemented: Backend project scaffolding for tictactoe-api
+## 2026-02-27 16:00 - US-001
+- Implemented database schema migration for game mode and turn tracking
 - Files changed:
-  - apps/tictactoe-api/package.json (NestJS deps, scripts)
-  - apps/tictactoe-api/tsconfig.json, tsconfig.build.json, nest-cli.json
-  - apps/tictactoe-api/.eslintrc.js (root: true for decorator support)
-  - apps/tictactoe-api/docker-compose.yml (postgres:16 on port 54322)
-  - apps/tictactoe-api/.env.local, .env.example
-  - apps/tictactoe-api/src/config/entities.ts (empty array placeholder)
-  - Root .prettierignore, .eslintrc.js (added tictactoe-api to ignore)
+  - `apps/tictactoe-api/src/modules/game/game.entity.ts` - Added mode, currentTurn, playerXToken, playerOToken columns with types
+  - `apps/tictactoe-api/src/migrations/1772236312254-AddGameModeAndTurnTracking.ts` - New migration: truncates game data, adds 4 new columns
 - **Learnings for future iterations:**
-  - .env.local is gitignored - don't try to `git add` it
-  - pnpm install succeeds with peer dep warnings for postgraphile-nest (expects NestJS ^7 but we use ^8) - this is fine, same as realty-ai-api
-  - Need at least one .ts file in src/ for typecheck to work (created entities.ts early)
+  - SnakeNamingStrategy handles camelCase -> snake_case automatically, but explicit `name` overrides in `@Column` decorators take precedence (e.g., `board_state`)
+  - Migration ran successfully with TRUNCATE before ALTER TABLE to avoid default value issues on existing rows
+  - Typecheck and lint pass cleanly
 ---
 
-## 2026-02-26 - US-002
-- What was implemented: Database configuration utilities for TypeORM and PostGraphile
+## 2026-02-27 16:15 - US-002
+- Copied game logic and shared types to backend
 - Files changed:
-  - apps/tictactoe-api/src/config/postgres.ts (getConfig, getAdminConfig, getClient with port 54322 and db 'tictactoe')
-  - apps/tictactoe-api/src/config/typeorm.ts (getTypeOrmConfig, getTypeOrmModuleConfig with SnakeNamingStrategy, default DataSource export for CLI)
-  - apps/tictactoe-api/src/config/graphile.ts (postgraphileConfigFactory for PostGraphile NestJS integration)
+  - `apps/tictactoe-api/src/lib/game/types.ts` - Created with CellValue, Board (9-element tuple), GameMove, GameStatus, GameMode types
+  - `apps/tictactoe-api/src/lib/game/gameLogic.ts` - Copied verbatim from frontend, updated import from `@/types/game` to `./types`
 - **Learnings for future iterations:**
-  - entities.ts was already created in US-001 scaffolding - no need to recreate it
-  - typeorm.ts dotenv.config() path uses `__dirname + '../../.env.local'` since the file is in src/config/
-  - graphile.ts is identical to realty-ai-api version - no project-specific changes needed
+  - The frontend types file at `apps/tictactoe/src/types/game.ts` has extra types (GameState, GameSummary) not needed in backend — only copied the shared subset
+  - The entity file already defines CellValue, GameMove, GameStatus, GameMode — there is now duplication between entity types and lib/game/types.ts. Future stories may want to consolidate by importing from lib/game/types.ts in the entity
+  - All 9 pure functions are available: checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay
 ---
 
-## 2026-02-26 - US-003
-- What was implemented: Game entity with TypeORM decorators and type exports
+## 2026-02-27 16:35 - US-003
+- Created GameModule with POST /api/games endpoint for creating games
 - Files changed:
-  - apps/tictactoe-api/src/modules/game/game.entity.ts (Game entity with id, boardState, status, winner, moves, createdAt, updatedAt; CellValue, GameMove, GameStatus type exports)
-  - apps/tictactoe-api/src/config/entities.ts (added Game to entity registry)
+  - `apps/tictactoe-api/src/modules/game/dto/create-game.dto.ts` - CreateGameDto with @IsIn validation for mode field
+  - `apps/tictactoe-api/src/modules/game/dto/game-state.dto.ts` - GameStateDto and CreateGameResponseDto (game state + playerToken)
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - GameService with createGame() and toGameStateDto() helper
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - GameController with POST /api/games
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - GameModule importing TypeOrmModule.forFeature([Game])
+  - `apps/tictactoe-api/src/app.module.ts` - Registered GameModule in AppModule imports
+  - `apps/tictactoe-api/package.json` - Added class-validator and class-transformer dependencies
 - **Learnings for future iterations:**
-  - JSONB column defaults must be plain JS values (arrays/objects), TypeORM handles serialization
-  - SnakeNamingStrategy auto-converts camelCase property names to snake_case column names, but explicit `name` in @Column/@CreateDateColumn is still best practice for clarity
-  - Game module directory was pre-created in US-001 scaffolding as empty dir
+  - class-validator and class-transformer were already listed in package.json but not installed — pnpm install pulled them in
+  - Entity types (CellValue, GameMove, GameStatus, GameMode) are imported from game.entity.ts in DTOs — keeps a single source of truth within the game module
+  - GameStateDto maps boardState -> board to match the frontend's expected API shape
+  - playerToken is returned as a separate top-level field in CreateGameResponseDto, not part of GameStateDto
+  - ValidationPipe with whitelist:true strips unknown properties from request body
 ---
 
-## 2026-02-26 - US-004
-- What was implemented: NestJS application bootstrap (app.service, app.controller, app.module, main.ts)
+## 2026-02-27 17:00 - US-004
+- Added GET /api/games/:id endpoint to fetch game state
 - Files changed:
-  - apps/tictactoe-api/src/app.service.ts (getRoot returns {message: 'TicTacToe API'}, getHealth returns {status: 'ok'})
-  - apps/tictactoe-api/src/app.controller.ts (GET / and GET /health endpoints)
-  - apps/tictactoe-api/src/app.module.ts (TypeOrmModule.forRoot + PostGraphileModule.forRootAsync)
-  - apps/tictactoe-api/src/main.ts (bootstrap on port 3002 with dotenv from .env.local)
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added getGame() method with NotFoundException for missing games
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get(':id') endpoint returning GameStateDto
 - **Learnings for future iterations:**
-  - Files were already committed in prior iteration but PRD wasn't updated - always update PRD after commit
-  - main.ts dotenv path uses `path.join(__dirname, '../.env.local')` (relative to dist/ at runtime)
-  - PostGraphileModule.forRootAsync uses empty imports/inject arrays with postgraphileConfigFactory
+  - toGameStateDto() already strips playerXToken and playerOToken — no extra work needed for security
+  - NotFoundException from @nestjs/common auto-returns 404 with descriptive JSON message
+  - Pre-commit eslint decorator parsing errors are pre-existing and not caused by changes — lint-staged still passes
 ---
 
-## 2026-02-26 - US-005
-- What was implemented: Database migration and seed data (retroactively marking as passed - was committed prior)
+## 2026-02-27 17:20 - US-005
+- Added POST /api/games/:id/move endpoint for making moves with full game logic validation
 - Files changed:
-  - apps/tictactoe-api/src/migrations/1772154510409-CreateGame.ts (TypeORM migration for game table)
-  - apps/tictactoe-api/src/cli/seed.ts (inserts 2 sample games)
-  - apps/tictactoe-api/src/cli/migration.ts (cleanup utility placeholder)
+  - `apps/tictactoe-api/src/modules/game/dto/make-move.dto.ts` - Created MakeMoveDto with @IsInt, @Min(0), @Max(8) validation on position
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added makeMove() method with transaction, SELECT FOR UPDATE, game logic validation
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/move') endpoint with ValidationPipe
 - **Learnings for future iterations:**
-  - Migration filename includes timestamp prefix for ordering
-  - Seed script and migration were committed together in same story
+  - TypeORM `DataSource` is injectable without @Inject decorator — NestJS auto-resolves it from the TypeORM module
+  - Use `queryRunner.manager.getRepository(Game).createQueryBuilder('game').setLock('pessimistic_write')` for SELECT ... FOR UPDATE
+  - Board stored as JSONB in DB needs `as Board` cast when using with game logic functions expecting the 9-element tuple type
+  - Game logic functions imported from `../../lib/game/gameLogic` — relative path from modules/game/ directory
+  - `moveNumber` is 1-indexed: `game.moves.length + 1` before adding the new move
+  - Winner field on game over: set to 'X' or 'O' for wins, null for draws; currentTurn only flips on in_progress continuation
 ---
 
-## 2026-02-26 - US-006
-- What was implemented: Verified PostGraphile GraphQL API and enabled CORS
+## 2026-02-27 17:40 - US-006
+- Added GET /api/games endpoint to list recent games with optional limit
 - Files changed:
-  - apps/tictactoe-api/src/main.ts (added `app.enableCors()`)
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added listGames(limit) method using repository.find with order and take
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get() handler with @Query('limit') param, placed before @Get(':id') to avoid route conflicts
 - **Learnings for future iterations:**
-  - PostGraphile generates allGames { nodes { ... } } connection pattern automatically
-  - createGame mutation accepts `input: { game: {} }` with empty game object for defaults
-  - updateGameById mutation uses `input: { id: UUID, gamePatch: { ... } }` pattern
-  - JSONB fields (boardState, moves) accept JSON directly via GraphQL variables (not inline)
-  - GraphQL field names are auto-camelCased from snake_case DB columns
+  - Route order matters in NestJS controllers: @Get() must come before @Get(':id') or the parameterized route will catch all requests
+  - Query params come as strings — parse to int before passing to service, with fallback to undefined for default
+  - Lint auto-fixed `limit: number = 20` to `limit = 20` (type inference from default value)
+  - toGameStateDto() already strips player tokens so listGames response is safe by default
 ---
 
-## 2026-02-26 - US-007
-- What was implemented: Frontend project scaffolding for tictactoe Next.js app
+## 2026-02-27 18:00 - US-007
+- Added POST /api/games/:id/join endpoint for Player O to join PvP games
 - Files changed:
-  - apps/tictactoe/package.json (Next.js 14, React 18, Tailwind, LangChain, Apollo Client, shadcn/ui deps)
-  - apps/tictactoe/tsconfig.json (extending @boilertowns-example/tsconfig/web.json with @/* path alias)
-  - apps/tictactoe/next.config.js, postcss.config.js, tailwind.config.ts (copied from realty-ai)
-  - apps/tictactoe/.env.local (Bedrock creds + NEXT_PUBLIC_GRAPHQL_URL)
-  - apps/tictactoe/.env.example (template without secrets)
-  - apps/tictactoe/src/app/page.tsx, layout.tsx (minimal placeholders for typecheck)
-  - pnpm-lock.yaml (updated with new workspace package)
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added joinGame() method with mode validation, conflict check, and playerOToken generation
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/join') endpoint returning CreateGameResponseDto
 - **Learnings for future iterations:**
-  - .env.local is gitignored - won't be committed (same as backend pattern)
-  - Need at least page.tsx and layout.tsx in src/app/ for Next.js and typecheck to work
-  - Dev runs on port 2025 (realty-ai uses 2024, tictactoe-api uses 3002)
-  - Removed @aws-sdk/client-bedrock-runtime, @langchain/community, promptfoo, weather deps from realty-ai deps
-  - Peer dep warnings are expected and non-blocking (same as other workspace packages)
+  - ConflictException from @nestjs/common auto-returns 409 with descriptive JSON message — same pattern as NotFoundException for 404
+  - joinGame reuses CreateGameResponseDto (game state + playerToken) — same response shape as createGame since both return a token to the caller
+  - No ValidationPipe needed on join endpoint since there's no request body to validate
+  - Route placed before :id/move to maintain clean route ordering (though NestJS resolves literal segments before params so it works either way)
 ---
 
-## 2026-02-26 - US-008
-- What was implemented: Frontend base files (globals.css, layout.tsx, utils.ts) and shadcn/ui components (button, card, badge, scroll-area)
+## 2026-02-27 18:30 - US-008
+- Migrated AI pipeline to NestJS backend
 - Files changed:
-  - apps/tictactoe/src/app/globals.css (Tailwind base + CSS variables for light/dark themes)
-  - apps/tictactoe/src/app/layout.tsx (updated with Metadata type, globals.css import, Tailwind body classes)
-  - apps/tictactoe/src/lib/utils.ts (cn() utility using clsx + tailwind-merge)
-  - apps/tictactoe/src/components/ui/button.tsx (shadcn/ui Button with variants)
-  - apps/tictactoe/src/components/ui/card.tsx (shadcn/ui Card components)
-  - apps/tictactoe/src/components/ui/badge.tsx (shadcn/ui Badge with variants)
-  - apps/tictactoe/src/components/ui/scroll-area.tsx (shadcn/ui ScrollArea)
+  - `apps/tictactoe-api/src/modules/ai/ai.module.ts` - Created AiModule exporting AiService
+  - `apps/tictactoe-api/src/modules/ai/ai.service.ts` - Created AiService with generateMove(board) method, defense-in-depth isValidMove check
+  - `apps/tictactoe-api/src/modules/ai/move-graph.ts` - Copied from frontend, updated imports to relative paths
+  - `apps/tictactoe-api/src/modules/ai/nodes.ts` - Copied from frontend, updated imports: `../../lib/game/gameLogic` and local AI modules
+  - `apps/tictactoe-api/src/modules/ai/graph-state.ts` - Copied from frontend, updated Board import to `../../lib/game/types`
+  - `apps/tictactoe-api/src/modules/ai/move-validator.ts` - Copied verbatim (no import changes needed, only uses zod)
+  - `apps/tictactoe-api/src/modules/ai/llm.ts` - Copied verbatim (uses @langchain/aws, env vars for credentials)
+  - `apps/tictactoe-api/src/modules/ai/move-prompt.ts` - Copied verbatim (uses @langchain/core/prompts)
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added AiModule to imports
+  - `apps/tictactoe-api/package.json` - Added @langchain/aws, @langchain/core, @langchain/langgraph, zod; upgraded NestJS to v10, TypeScript to v5.9
+  - `apps/tictactoe-api/.env.local` - Added AI_AWS_BEDROCK_* env vars
+  - `apps/tictactoe-api/.env.example` - Added AI_AWS_BEDROCK_* env vars
 - **Learnings for future iterations:**
-  - shadcn/ui components are self-contained and can be directly copied between Next.js apps without modification
-  - All UI components use @/lib/utils cn() function - must create utils.ts before UI components
-  - globals.css CSS variables define the shadcn/ui theme - required for component styles to work
-  - layout.tsx needs `import './globals.css'` for styles to be applied
----
-
-## 2026-02-26 - US-009
-- What was implemented: Game types (CellValue, Board, GameMove, GameStatus, GameState, GameSummary) and deterministic game logic functions
-- Files changed:
-  - apps/tictactoe/src/types/game.ts (all game type definitions)
-  - apps/tictactoe/src/lib/game/gameLogic.ts (WIN_LINES, checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay)
-- **Learnings for future iterations:**
-  - Board type is a 9-element tuple, not an array - use `as Board` when spreading
-  - All game logic functions are pure - no state mutations, always return new values
-  - getCurrentTurn counts X's and O's to determine turn (X goes first, so X count <= O count means X's turn)
-  - formatBoardForDisplay uses '.' for empty cells - this format is used in the LLM prompt
-  - Linter reformats to tabs (project uses tabs, not spaces)
----
-
-## 2026-02-26 - US-010
-- What was implemented: LangGraph AI move pipeline with 6 files for LLM-powered tic-tac-toe move generation
-- Files changed:
-  - apps/tictactoe/src/lib/ai/llm.ts (ChatBedrockConverse instance with DeepSeek-R1, temp 0.7, maxTokens 256)
-  - apps/tictactoe/src/lib/ai/movePrompt.ts (ChatPromptTemplate with system/user messages for move selection)
-  - apps/tictactoe/src/lib/ai/moveValidator.ts (Zod schema for position validation, parseMoveResponse strips <think> tags)
-  - apps/tictactoe/src/lib/ai/graphState.ts (Annotation.Root with board, available_positions, board_display, ai_move)
-  - apps/tictactoe/src/lib/ai/nodes.ts (inputValidationNode, moveGenerationNode with 3 retries, moveValidationNode)
-  - apps/tictactoe/src/lib/ai/moveGraph.ts (StateGraph: START -> inputValidation -> moveGeneration -> moveValidation -> END)
-- **Learnings for future iterations:**
-  - Zod v4 `.refine()` second argument must be a string or options object `{ message: string }`, NOT a function returning a string (v3 pattern doesn't work)
-  - DeepSeek-R1 response content may be string or array of content blocks - must handle both cases
-  - LLM response parsing: strip `<think>...</think>` tags first, then extract digit 0-8
-  - LangGraph StateGraph pattern: define Annotation.Root state, create node functions returning Partial<State>, chain with addNode/addEdge, compile
-  - Linter will reformat long template strings - check committed code matches expected formatting
----
-
-## 2026-02-26 - US-011
-- What was implemented: AI move API route (POST /api/ai-move) that accepts a board state, validates it, invokes the LangGraph AI move pipeline, and returns the AI's chosen position with updated board
-- Files changed:
-  - apps/tictactoe/src/app/api/ai-move/route.ts (new file - POST handler with board validation, game-over check, moveGraph invocation, defense-in-depth move validation, error handling)
-- **Learnings for future iterations:**
-  - Follow realty-ai generate-email route pattern: try/catch with SyntaxError check for malformed JSON, surface error messages from LLM failures
-  - Board validation uses type guard functions (isValidCellValue, isValidBoard) for clean TypeScript narrowing
-  - AI always plays 'O' - hardcoded in applyMove call since human is always 'X'
-  - Defense in depth: double-check AI move with isValidMove before responding, even though the LangGraph pipeline has its own validation
-  - Linter reformats multi-line imports to single-line and collapses short boolean expressions - run eslint --fix before committing
----
-
-## 2026-02-26 - US-012
-- What was implemented: GraphQL integration layer with Apollo Client, queries, mutations, transforms, and hooks
-- Files changed:
-  - apps/tictactoe/src/lib/graphql/client.ts (Apollo Client with HttpLink to localhost:3002/graphql, cache-and-network/network-only policies)
-  - apps/tictactoe/src/lib/graphql/queries.ts (GET_ALL_GAMES with CREATED_AT_DESC ordering, GET_GAME_BY_ID)
-  - apps/tictactoe/src/lib/graphql/mutations.ts (CREATE_GAME with CreateGameInput, UPDATE_GAME with UpdateGameByIdInput)
-  - apps/tictactoe/src/lib/graphql/transforms.ts (GraphQLGameNode type, transformGameToSummary function)
-  - apps/tictactoe/src/lib/graphql/hooks.ts (useGameHistory hook with games/loading/error/refetch)
-- **Learnings for future iterations:**
-  - Apollo Client pattern is identical to realty-ai except for port (3002 vs 3001)
-  - useGameHistory exposes a `refetch` function so the game page can refresh history after saving a completed game
-  - GraphQLGameNode type maps PostGraphile's camelCase fields (boardState, createdAt) to frontend types
-  - transformGameToSummary handles null winner and missing moves array gracefully with nullish coalescing
----
-
-## 2026-02-26 - US-013
-- What was implemented: Game board UI components - Cell, GameBoard, GameStatus, and NewGameButton
-- Files changed:
-  - apps/tictactoe/src/components/Cell.tsx (clickable 96x96px button showing X/O/empty, hover state, disabled logic)
-  - apps/tictactoe/src/components/GameBoard.tsx (3x3 CSS grid of Cell components with onCellClick callback)
-  - apps/tictactoe/src/components/GameStatus.tsx (contextual messages with status-specific colors and animate-pulse for AI thinking)
-  - apps/tictactoe/src/components/NewGameButton.tsx (outline Button that triggers onClick to reset game)
-- **Learnings for future iterations:**
-  - Cell uses h-24 w-24 for 96px sizing (Tailwind's h-24/w-24 = 6rem = 96px)
-  - GameBoard disables all cells via a single `disabled` prop - game-over and AI-thinking states are handled by the parent
-  - GameStatus uses a Record<GameStatusType, {text, className}> mapping for clean status-to-message lookup
-  - No browser testing tools available - manual browser verification needed
----
-
-## 2026-02-26 - US-014
-- What was implemented: Game history sidebar components - GameHistoryItem and GameHistorySidebar
-- Files changed:
-  - apps/tictactoe/src/components/GameHistoryItem.tsx (displays date/time with short format, move count, result Badge with Win/Loss/Draw variants)
-  - apps/tictactoe/src/components/GameHistorySidebar.tsx (Card with Game History header, ScrollArea at h-[400px], loading/empty states)
-- **Learnings for future iterations:**
-  - GameHistorySidebar takes `games` and `loading` as props from the parent (not using the hook directly) - keeps it a presentational component
-  - Badge variants map: x_wins=default (green), o_wins=destructive (red), draw=secondary (gray)
-  - Date formatting uses toLocaleDateString with month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-  - No browser testing tools available - manual browser verification needed
----
-
-## 2026-02-26 - US-015
-- What was implemented: Main game page (page.tsx) with full game state management, AI integration, and game history persistence
-- Files changed:
-  - apps/tictactoe/src/app/page.tsx (rewrote from placeholder to full 'use client' component with useState GameState, handleCellClick with human+AI moves, handleNewGame reset, saveCompletedGame via GraphQL mutation, 2-column layout with game board and history sidebar)
-- **Learnings for future iterations:**
-  - Game status must be checked after BOTH human move and AI response - human can win/draw before AI plays
-  - isAiThinking flag prevents double-clicks during API call by disabling board and guarding handleCellClick
-  - saveCompletedGame is fire-and-forget (try/catch with console.error only) - failed saves don't break the game UX
-  - Frontend is source of truth for in-progress games; backend only receives completed games via createGame mutation
-  - API route returns `{ position, board }` - use the returned board directly rather than recomputing
-  - Layout: md:grid-cols-3 with game area at md:col-span-2 and sidebar at col-span-1
-  - No browser testing tools available - manual browser verification needed
+  - Zod v4 (4.3.6) is pulled in as a transitive dep from @langchain/core — its .d.cts files are incompatible with TypeScript 4.9 (skipLibCheck doesn't skip .d.cts). Must use TypeScript 5.x.
+  - NestJS 8's @Inject/@InjectRepository parameter decorator types are incompatible with TypeScript 5.x (TS1239 error). Upgrading to NestJS 10 fixes this.
+  - The NestJS v8 -> v10 + TS 4.9 -> 5.9 upgrade was necessary for the langchain dependency chain: @langchain/core -> zod v4 -> requires TS 5.x -> requires NestJS 10
+  - AI files use kebab-case filenames in backend (move-graph.ts vs moveGraph.ts in frontend) to match backend conventions
+  - zod@3.25.32 is installed as direct dependency for the move-validator.ts; zod@4.3.6 exists as transitive from @langchain/core
+  - AiService wraps the LangGraph pipeline with a defense-in-depth isValidMove() check after AI generates a move
 ---
