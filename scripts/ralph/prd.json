@@ -171,7 +171,7 @@
 				"Typecheck passes"
 			],
 			"priority": 10,
-			"passes": false,
+			"passes": true,
 			"notes": "Read token from request headers: @Headers('x-player-token') in controller, pass to service. Add token param to makeMove() service method."
 		},
 		{
@@ -188,7 +188,7 @@
 				"Typecheck passes"
 			],
 			"priority": 11,
-			"passes": false,
+			"passes": true,
 			"notes": "Simple fetch wrappers. No Apollo Client — these are REST endpoints, not GraphQL. Add NEXT_PUBLIC_API_URL=http://localhost:3002 to apps/tictactoe/.env.local."
 		},
 		{
@@ -208,7 +208,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 12,
-			"passes": false,
+			"passes": true,
 			"notes": "Use existing GameBoard, GameStatus, NewGameButton, Cell components. State shape similar to current page.tsx but driven by API responses instead of local game logic. localStorage key format: playerToken-{gameId}."
 		},
 		{

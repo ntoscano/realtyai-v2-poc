@@ -149,3 +149,44 @@ Started: Fri Feb 27 15:47:49 PST 2026
   - `catch {}` (empty catch binding) is valid in TypeScript 5.9 — no need for `catch (_error)`
   - The response bundles both moves so frontend gets complete state in one round trip (no separate AI endpoint needed)
 ---
+
+## 2026-02-27 20:00 - US-010
+- Added PvP player token validation to makeMove endpoint
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added `@Headers('x-player-token')` param to makeMove, passes to service
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added `playerToken` param to makeMove(), PvP token validation with ForbiddenException
+- **Learnings for future iterations:**
+  - `@Headers('x-player-token')` returns `string | undefined` — NestJS auto-extracts the header value by name
+  - ForbiddenException from @nestjs/common auto-returns 403 — same pattern as NotFoundException (404), ConflictException (409), BadRequestException (400)
+  - Token validation is placed after the `in_progress` check but before `isValidMove` — order matters for meaningful error messages
+  - AI mode skips token validation entirely (guard clause: `if (game.mode === 'pvp')`) — human is always X in AI mode so no token needed
+  - `ConflictException` was already imported but unused warning didn't trigger because lint-staged scopes to changed files
+---
+
+## 2026-02-27 20:30 - US-011
+- Created frontend REST API client at apps/tictactoe/src/lib/api/gameApi.ts
+- Files changed:
+  - `apps/tictactoe/src/lib/api/gameApi.ts` - New file: fetch-based API client with createGame, getGame, makeMove, joinGame, listGames functions
+  - `apps/tictactoe/.env.example` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
+  - `apps/tictactoe/.env.local` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
+- **Learnings for future iterations:**
+  - Frontend types for API responses are defined locally in gameApi.ts (GameStateDto, CreateGameResponse) rather than importing from backend — keeps frontend decoupled from backend module structure
+  - The backend GameStateDto has `board: CellValue[]` (array) while frontend Game types use `Board` (9-element tuple) — consuming code may need to cast
+  - `createdAt` and `updatedAt` are typed as `string` in frontend DTO (JSON serializes dates as ISO strings), not `Date` as in backend DTO
+  - Generic `apiFetch<T>()` helper centralizes error handling with status code + response text in error message
+  - X-Player-Token header is only included when playerToken is provided — works for both AI mode (no token) and PvP mode (with token)
+  - .env.local is NOT committed (contains credentials) — only .env.example is committed
+---
+
+## 2026-02-27 21:00 - US-012
+- Created unified game board page at /game/[id] that loads game by ID and handles moves via REST API
+- Files changed:
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - New 'use client' page: fetches game state via getGame(), renders GameBoard/GameStatus/NewGameButton, handles moves via makeMove() API, reads playerToken from localStorage
+- **Learnings for future iterations:**
+  - `useParams<{ id: string }>()` from next/navigation provides typed dynamic route params in Next.js app router
+  - GameStateDto.board is `CellValue[]` (array) but GameBoard expects `Board` (9-element tuple) — cast with `as Board`
+  - AI mode: set isAiThinking=true before makeMove call since the response bundles both human and AI moves (one round trip)
+  - PvP mode: read playerToken from localStorage with key `playerToken-{gameId}` — this is set by the create/join pages
+  - NewGameButton navigates back to `/` (AI) or `/x` (PvP) depending on game mode
+  - Error handling: check for '404' in error message for game-not-found, show generic error for other failures
+---
