@@ -37,6 +37,13 @@ export class GameController {
 		return this.gameService.getGame(id);
 	}
 
+	@Post(':id/join')
+	async joinGame(
+		@Param('id') id: string,
+	): Promise<CreateGameResponseDto> {
+		return this.gameService.joinGame(id);
+	}
+
 	@Post(':id/move')
 	@UsePipes(new ValidationPipe({ whitelist: true }))
 	async makeMove(

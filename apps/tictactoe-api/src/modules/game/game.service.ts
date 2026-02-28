@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
@@ -64,6 +65,31 @@ export class GameService {
 		}
 
 		return this.toGameStateDto(game);
+	}
+
+	async joinGame(id: string): Promise<CreateGameResponseDto> {
+		const game = await this.gameRepository.findOne({ where: { id } });
+
+		if (!game) {
+			throw new NotFoundException(`Game with ID "${id}" not found`);
+		}
+
+		if (game.mode !== 'pvp') {
+			throw new BadRequestException('Only PvP games can be joined');
+		}
+
+		if (game.playerOToken) {
+			throw new ConflictException('Player O has already joined this game');
+		}
+
+		const playerOToken = randomUUID();
+		game.playerOToken = playerOToken;
+		await this.gameRepository.save(game);
+
+		return {
+			game: this.toGameStateDto(game),
+			playerToken: playerOToken,
+		};
 	}
 
 	async makeMove(id: string, position: number): Promise<GameStateDto> {
