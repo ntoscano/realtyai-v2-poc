@@ -5,6 +5,7 @@ import { GameStatus } from '@/components/GameStatus';
 import { NewGameButton } from '@/components/NewGameButton';
 import { getGame, makeMove } from '@/lib/api/gameApi';
 import type { GameStateDto } from '@/lib/api/gameApi';
+import { useGameSocket } from '@/lib/api/useGameSocket';
 import type { Board } from '@/types/game';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -18,6 +19,10 @@ export default function GamePage() {
 	const [error, setError] = useState<string | null>(null);
 
 	const gameId = params.id;
+
+	useGameSocket(game ? gameId : null, game?.mode ?? 'ai', (state) => {
+		setGame(state);
+	});
 
 	useEffect(() => {
 		async function loadGame() {
