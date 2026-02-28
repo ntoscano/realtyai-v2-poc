@@ -16,9 +16,6 @@
 	],
 	"dependencies": {
 		"@apollo/client": "^4.1.2",
-		"@langchain/aws": "^1.2.1",
-		"@langchain/core": "^1.1.17",
-		"@langchain/langgraph": "^1.1.2",
 		"@radix-ui/react-scroll-area": "^1.2.10",
 		"@radix-ui/react-slot": "^1.2.4",
 		"class-variance-authority": "^0.7.1",
@@ -28,8 +25,8 @@
 		"next": "^14.2.0",
 		"react": "^18.2.0",
 		"react-dom": "^18.2.0",
-		"tailwind-merge": "^3.4.0",
-		"zod": "^4.3.6"
+		"socket.io-client": "^4.8.0",
+		"tailwind-merge": "^3.4.0"
 	},
 	"devDependencies": {
 		"@boilertowns-example/tsconfig": "workspace:*",
