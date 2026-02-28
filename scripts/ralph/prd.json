@@ -155,7 +155,7 @@
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": false,
+			"passes": true,
 			"notes": "Inject AiService into GameService. AI always plays O. The response bundles both moves so frontend gets complete state in one round trip."
 		},
 		{

@@ -2,6 +2,7 @@ import {
 	BadRequestException,
 	ConflictException,
 	Injectable,
+	InternalServerErrorException,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,6 +15,7 @@ import {
 	isValidMove,
 } from '../../lib/game/gameLogic';
 import { Board } from '../../lib/game/types';
+import { AiService } from '../ai/ai.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { CreateGameResponseDto, GameStateDto } from './dto/game-state.dto';
 import { Game } from './game.entity';
@@ -24,6 +26,7 @@ export class GameService {
 		@InjectRepository(Game)
 		private readonly gameRepository: Repository<Game>,
 		private readonly dataSource: DataSource,
+		private readonly aiService: AiService,
 	) {}
 
 	async createGame(dto: CreateGameDto): Promise<CreateGameResponseDto> {
@@ -121,16 +124,17 @@ export class GameService {
 				);
 			}
 
-			const newBoard = applyMove(board, position, game.currentTurn);
-			const moveNumber = game.moves.length + 1;
+			// Apply human move
+			let currentBoard = applyMove(board, position, game.currentTurn);
+			const humanMoveNumber = game.moves.length + 1;
 
-			game.boardState = newBoard;
+			game.boardState = currentBoard;
 			game.moves = [
 				...game.moves,
-				{ position, player: game.currentTurn, moveNumber },
+				{ position, player: game.currentTurn, moveNumber: humanMoveNumber },
 			];
 
-			const status = getGameStatus(newBoard);
+			let status = getGameStatus(currentBoard);
 			game.status = status;
 
 			if (status === 'x_wins') {
@@ -141,6 +145,41 @@ export class GameService {
 				game.winner = null;
 			} else {
 				game.currentTurn = game.currentTurn === 'X' ? 'O' : 'X';
+			}
+
+			// In AI mode, if game is still in progress after human move, trigger AI counter-move
+			if (game.mode === 'ai' && game.status === 'in_progress') {
+				let aiPosition: number;
+				try {
+					aiPosition = await this.aiService.generateMove(
+						currentBoard as Board,
+					);
+				} catch {
+					throw new InternalServerErrorException(
+						'AI pipeline failed to generate a move. Please try again.',
+					);
+				}
+
+				currentBoard = applyMove(currentBoard as Board, aiPosition, 'O');
+				const aiMoveNumber = game.moves.length + 1;
+
+				game.boardState = currentBoard;
+				game.moves = [
+					...game.moves,
+					{ position: aiPosition, player: 'O', moveNumber: aiMoveNumber },
+				];
+
+				status = getGameStatus(currentBoard);
+				game.status = status;
+
+				if (status === 'o_wins') {
+					game.winner = 'O';
+				} else if (status === 'draw') {
+					game.winner = null;
+				} else {
+					// Game continues — turn flips back to X
+					game.currentTurn = 'X';
+				}
 			}
 
 			await queryRunner.manager.save(game);

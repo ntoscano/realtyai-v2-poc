@@ -136,3 +136,16 @@ Started: Fri Feb 27 15:47:49 PST 2026
   - zod@3.25.32 is installed as direct dependency for the move-validator.ts; zod@4.3.6 exists as transitive from @langchain/core
   - AiService wraps the LangGraph pipeline with a defense-in-depth isValidMove() check after AI generates a move
 ---
+
+## 2026-02-27 19:00 - US-009
+- Integrated AI move into makeMove endpoint — after human move in AI mode, backend auto-triggers AI counter-move
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected AiService, added AI move logic after human move in AI mode, added InternalServerErrorException for AI failures
+- **Learnings for future iterations:**
+  - AiService is already available in GameModule via AiModule import (set up in US-008) — just needs constructor injection in GameService
+  - AI always plays 'O' — no need to parameterize the player for AI moves
+  - The AI move block only fires when `game.mode === 'ai' && game.status === 'in_progress'` — this means it correctly skips when the human move already ends the game (X wins or draw)
+  - Both human and AI moves are committed in the same transaction — if AI fails, the whole transaction rolls back cleanly
+  - `catch {}` (empty catch binding) is valid in TypeScript 5.9 — no need for `catch (_error)`
+  - The response bundles both moves so frontend gets complete state in one round trip (no separate AI endpoint needed)
+---
