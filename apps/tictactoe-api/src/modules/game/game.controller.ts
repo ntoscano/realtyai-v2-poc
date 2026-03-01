@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Get,
@@ -12,7 +13,6 @@ import {
 
 import { CreateGameDto } from './dto/create-game.dto';
 import { CreateGameResponseDto, GameStateDto } from './dto/game-state.dto';
-import { MakeMoveDto } from './dto/make-move.dto';
 import { GameService } from './game.service';
 
 @Controller('api/games')
@@ -46,12 +46,17 @@ export class GameController {
 	}
 
 	@Post(':id/move')
-	@UsePipes(new ValidationPipe({ whitelist: true }))
 	async makeMove(
 		@Param('id') id: string,
-		@Body() dto: MakeMoveDto,
+		@Body() body: { position: number },
 		@Headers('x-player-token') playerToken?: string,
 	): Promise<GameStateDto> {
-		return this.gameService.makeMove(id, dto.position, playerToken);
+		const position = Number(body.position);
+		if (!Number.isInteger(position) || position < 0 || position > 8) {
+			throw new BadRequestException(
+				'position must be an integer between 0 and 8',
+			);
+		}
+		return this.gameService.makeMove(id, position, playerToken);
 	}
 }

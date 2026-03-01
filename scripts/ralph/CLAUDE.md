@@ -80,6 +80,40 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## Production Mindset
+
+When implementing features, apply these principles:
+
+### Never Trust the Client
+
+- All validation MUST happen on the backend. Frontend validation is UX convenience only.
+- API endpoints should validate inputs using DTOs with class-validator decorators.
+- Use `ValidationPipe({ whitelist: true })` to strip unknown properties.
+- The frontend sends _intents_ (e.g., `{ position: 4 }`), never pre-computed state.
+
+### Handle Errors with Proper Status Codes
+
+- Use NestJS built-in exceptions: `NotFoundException` (404), `BadRequestException` (400), `ForbiddenException` (403), `ConflictException` (409).
+- Never return generic 500 errors for expected failure cases.
+- Every error response should include a message explaining what went wrong.
+
+### Consider Concurrency for Shared State
+
+- If two requests can modify the same database row simultaneously, use pessimistic locking (`SELECT...FOR UPDATE`) or optimistic locking (version column).
+- Wrap multi-step database operations in transactions.
+- Example: reading a game, validating a move, then saving the updated board — these MUST be atomic.
+
+### Security by Default
+
+- Separate database roles for different access levels (e.g., read-only for PostGraphile, full-access for TypeORM).
+- Validate authorization (who is making this request?) separately from authentication (is this a valid session?).
+- Apply defense-in-depth: validate at the API boundary AND at the service layer.
+
+### Defense-in-Depth Validation
+
+- Validate the same invariant at multiple layers. If the AI pipeline validates a move, the service layer should validate it again independently.
+- Each layer assumes the previous layer might have a bug.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):

@@ -28,6 +28,7 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 - **Core Functionality:** What are the key actions?
 - **Scope/Boundaries:** What should it NOT do?
 - **Success Criteria:** How do we know it's done?
+- **Production Concerns:** Are there security, concurrency, or scaling considerations? Who can access this? What happens under concurrent requests?
 
 ### Format Questions Like This:
 
@@ -96,6 +97,10 @@ Each story should be small enough to implement in one focused session.
 
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
 - **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+- **For stories involving API endpoints or shared state:** Include error-case acceptance criteria, not just the happy path. Examples:
+  - "Returns 400 if position is out of range"
+  - "Returns 409 if resource is already claimed"
+  - "Returns 403 if player token does not match current turn"
 
 ### 4. Functional Requirements
 
@@ -122,14 +127,24 @@ What this feature will NOT include. Critical for managing scope.
 - Integration points with existing systems
 - Performance requirements
 
-### 8. Success Metrics
+### 8. Production Considerations (When Applicable)
+
+Include this section when the feature involves shared state, user input, or external-facing APIs:
+
+- **Input Validation:** What inputs need server-side validation? What are the constraints (types, ranges, formats)?
+- **Authorization:** Who can perform each action? How is this enforced?
+- **Concurrency:** Can two users modify the same data simultaneously? What locking/conflict resolution strategy applies?
+- **Error Handling:** What are the expected failure cases? What status codes and messages should each return?
+- **Security Boundaries:** Where are the trust boundaries? What should the server never trust from the client?
+
+### 9. Success Metrics
 
 How will success be measured?
 
 - "Reduce time to complete X by 50%"
 - "Increase conversion rate by 10%"
 
-### 9. Open Questions
+### 10. Open Questions
 
 Remaining questions or areas needing clarification.
 
@@ -261,4 +276,5 @@ Before saving the PRD:
 - [ ] User stories are small and specific
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
+- [ ] Production considerations addressed (validation, auth, concurrency, error handling) where applicable
 - [ ] Saved to `tasks/prd-[feature-name].md`

@@ -1,0 +1,25 @@
+# Ralph Progress Log
+Started: Thu Feb 27 2026
+
+## Codebase Patterns
+- NestJS apps need `root: true` in `.eslintrc.js` and must be added to root `.prettierignore` and `.eslintrc.js` ignorePatterns (root config doesn't support decorators)
+- `.env.local` is gitignored by default - use `.env.example` for committed env template
+- TypeORM config uses `SnakeNamingStrategy` for PostgreSQL column naming conventions
+- Use `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` in CLI scripts and `'../.env.local'` in main.ts
+- Entity registry pattern: centralize all entities in `src/config/entities.ts`
+- PostGraphile auto-converts snake_case to camelCase in GraphQL (board_state -> boardState)
+- PostGraphile mutation input types: `CreateGameInput` has `game: {}` wrapper, `UpdateGameByIdInput` has `id` + `gamePatch: {...}`
+- JSONB columns accept JSON variables directly in PostGraphile mutations (use GraphQL variables, not inline objects)
+- Use `app.enableCors()` in NestJS main.ts for cross-origin frontend requests
+- Frontend port assignments: realty-ai=2024, tictactoe=2025; Backend: realty-ai-api=3001, tictactoe-api=3002
+- Next.js frontend apps need at least `src/app/page.tsx` and `src/app/layout.tsx` for typecheck to work
+- Zod v4 `.refine()` second arg must be string or `{ message: string }` object, NOT a function (differs from v3)
+- LangGraph pattern: Annotation.Root state → node functions returning Partial<State> → StateGraph with addNode/addEdge → compile
+- DeepSeek-R1 wraps reasoning in `<think>...</think>` tags - strip before parsing LLM output
+- Game entity at: apps/tictactoe-api/src/modules/game/game.entity.ts
+- Game logic pure functions at: apps/tictactoe/src/lib/game/gameLogic.ts (to be copied to backend)
+- AI pipeline files at: apps/tictactoe/src/lib/ai/ (6 files to be copied to backend)
+- TypeORM transactions: use EntityManager.transaction() with queryRunner for SELECT ... FOR UPDATE
+
+---
+

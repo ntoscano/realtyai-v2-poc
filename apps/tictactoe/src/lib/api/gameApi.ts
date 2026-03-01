@@ -23,11 +23,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 	const res = await fetch(`${API_URL}${path}`, {
+		...options,
 		headers: {
 			'Content-Type': 'application/json',
 			...options?.headers,
 		},
-		...options,
 	});
 
 	if (!res.ok) {

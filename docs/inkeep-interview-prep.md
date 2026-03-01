@@ -71,29 +71,66 @@ How do you debug when the LLM returns garbage? Log the prompt, the raw response,
 
 ### 3b. Worked Example: Your Tictactoe Architecture
 
-This is the project you built. You know every line. When they ask you to whiteboard an AI app, you can use this as your mental model and adapt it to whatever they throw at you.
+This is a backend-authoritative game engine with an AI opponent pipeline, PvP multiplayer via WebSockets, and defense-in-depth validation at every layer. The architecture separates deterministic game logic from probabilistic AI, enforces all rules server-side, and scales horizontally through Redis-backed Socket.IO.
 
-#### End-to-end data flow
+```
+Frontend (thin client)              Backend (game engine + AI)
+┌─────────────────────┐            ┌──────────────────────────────────────┐
+│  React UI            │            │  NestJS (tictactoe-api, port 3002)  │
+│  Sends intent only:  │──REST───→ │  GameController (REST /api/games)    │
+│  { position: 4 }     │            │    └─ ValidationPipe + DTOs          │
+│  + X-Player-Token    │            │  GameService (validation + state)    │
+│                      │            │    └─ SELECT...FOR UPDATE locking    │
+│  Renders server      │←─────────│  AiService (LangGraph pipeline)      │
+│  state, never        │            │    └─ defense-in-depth isValidMove() │
+│  computes it         │            │  GameGateway (Socket.IO + Redis)     │
+│                      │←──WS────│    └─ broadcasts PvP game updates     │
+│  useGameSocket()     │            │  gameLogic.ts (pure, deterministic)  │
+│  for PvP updates     │            │  PostGraphile (read-only queries)    │
+└─────────────────────┘            └──────────────────────────────────────┘
+                                                    │              │
+                                    ┌───────────────┘              └──────────────┐
+                                    │  TypeORM connection                          │
+                                    │  (postgres role, full CRUD)                  │
+                                    │                                              │
+                                    │  PostGraphile connection                     │
+                                    │  (postgraphile_user role, SELECT only)       │
+                                    └──────────────┬───────────────────────────────┘
+                                              ┌────┴─────┐    ┌──────────┐
+                                              │PostgreSQL │    │  Redis   │
+                                              │(Docker,   │    │(Socket.IO│
+                                              │ port 54322│    │ pub/sub) │
+                                              └──────────┘    └──────────┘
+```
+
+##### End-to-end data flow
 
 ```
 User clicks cell
-  → Frontend: applyMove(board, position, 'X') → getGameStatus(board)
-  → If game continues:
-      POST /api/ai-move { board: CellValue[9] }       ← Next.js API route (same process)
-        → API route: validates board shape + game status
-        → moveGraph.invoke({ board })
-            → inputValidation → moveGeneration (LLM + 3 retries) → moveValidation
-        → API route: defense-in-depth isValidMove() check
-        → Response: { position: number, board: CellValue[9] }
-  → Frontend: update state with AI board → getGameStatus()
-  → If game over:
-      Apollo Client → POST tictactoe-api:3002/graphql   ← separate NestJS service
-        → PostGraphile auto-generated createGame mutation
-        → PostgreSQL (game table: board_state, status, winner, moves)
-  → Sidebar: useGameHistory() → Apollo query → tictactoe-api → PostgreSQL
+  → Frontend: POST /api/games/:id/move { position: 4 }
+    + X-Player-Token header (PvP only)
+  → GameController: ValidationPipe validates DTO (@IsInt, @Min(0), @Max(8))
+  → GameService.makeMove():
+     1. SELECT ... FOR UPDATE (pessimistic lock — prevents concurrent corruption)
+     2. Validate game is in_progress (400 if not)
+     3. PvP: validate player token matches current turn (403 if wrong player)
+     4. isValidMove(board, position) — defense-in-depth (400 if occupied)
+     5. applyMove(board, position, currentTurn)
+     6. getGameStatus(newBoard)
+     7. If AI mode + still in_progress:
+        → AiService.generateMove(board)
+           → moveGraph.invoke({ board }) — same 3-node LangGraph pipeline
+           → defense-in-depth: isValidMove() on AI's position
+        → applyMove(board, aiPosition, 'O')
+        → getGameStatus() again (AI might win or draw)
+     8. Save to DB via TypeORM (full-access postgres role)
+     9. If PvP: GameGateway.broadcastGameUpdate() via Socket.IO → Redis pub/sub
+  → Response: GameStateDto { id, board, status, winner, moves, mode, currentTurn }
+  → Frontend: setGame(response) — renders server-validated state
+  → PvP opponent: receives gameUpdate via WebSocket → setGame() — real-time board sync
 ```
 
-#### AI pipeline (3-node LangGraph)
+##### AI pipeline (3-node LangGraph)
 
 ```
 START → [inputValidation] → [moveGeneration] → [moveValidation] → END
@@ -102,7 +139,7 @@ START → [inputValidation] → [moveGeneration] → [moveValidation] → END
             is still in_progress  ChatBedrockConverse    on the final board
             │                     │                     │
             computes              parses response:      if invalid, throws
-            available_positions   parseMoveResponse()   (caught by API route)
+            available_positions   parseMoveResponse()   (caught by AiService)
             │                     then fallback:
             formats board_display parseMoveFromReasoning()
                                   │
@@ -110,47 +147,54 @@ START → [inputValidation] → [moveGeneration] → [moveValidation] → END
                                   error feedback in prompt
 ```
 
-#### Component tree
+Defense-in-depth: after the pipeline returns, `AiService.generateMove()` calls `isValidMove()` independently before returning the position to `GameService`. Then `GameService` validates it _again_ before applying. Two independent checks at two layers.
+
+##### Component tree
 
 ```
-page.tsx (state owner — useState<GameState>)
-  ├── GameStatus (reads status + isAiThinking)
-  ├── GameBoard (reads board, fires onCellClick)
-  │     └── Cell x9 (renders X/O/empty, disabled when game over or AI thinking)
-  ├── NewGameButton (fires onNewGame → createInitialState())
-  └── GameHistorySidebar (reads game history from useGameHistory hook)
-        └── GameHistoryItem x N (renders winner badge, move count, timestamp)
+/ (creates AI game via REST, redirects to /game/:id)
+  └── GameHistorySidebar (useGameHistory → REST listGames())
+        └── GameHistoryItem x N (result badge + mode badge: AI/PvP)
+
+/game/[id] (unified game board — AI and PvP)
+  ├── ModeToggle ("Play vs AI" / "Play vs Human" — navigates to / or /x)
+  ├── GameStatus (mode-aware: "Your turn (X)" / "X's turn" / "AI is thinking...")
+  ├── GameBoard (renders board from server state, fires onCellClick)
+  │     └── Cell x9 (disabled when not your turn, game over, or AI thinking)
+  ├── Error display (server validation messages: "Not your turn", "Invalid position")
+  └── NewGameButton (navigates to / or /x based on current mode)
+
+/x (PvP — creates game, shows shareable /o?game=<id> link with copy button)
+/o (PvP — joins game via ?game=<id> param, redirects to /game/:id)
 ```
 
-#### Separation of concerns
+##### Separation of concerns
 
 ```
-┌──────────────────┐   ┌────────────────┐   ┌─────────────────────┐
-│  React UI         │   │  Next.js API   │   │  AI Pipeline        │
-│  page.tsx         │──→│  /api/ai-move  │──→│  moveGraph          │
-│  (presentation    │   │  (boundary +   │   │  (LangGraph:        │
-│   + state)        │   │   validation)  │   │   3 nodes)          │
-└──────────────────┘   └────────────────┘   └─────────────────────┘
-         │                     │                       │
-         │              ┌──────────────┐               │
-         │              │  gameLogic   │               │
-         └──────┬──────→│  (rules)     │←──────────────┘
-                │       └──────────────┘
-                │       deterministic, pure, shared
-                │
-                ↓ Apollo Client (GraphQL)
-┌──────────────────────────────────────────────────┐
-│  tictactoe-api (NestJS, port 3002)               │
-│  PostGraphile: auto-generates GraphQL from DB    │
-│  No custom resolvers — 100% schema-driven        │
-└──────────────────────────────────────────────────┘
-                │
-                ↓ TypeORM
-┌──────────────────────────────────────────────────┐
-│  PostgreSQL (Docker, port 54322)                 │
-│  game table: id, board_state, status, winner,    │
-│  moves, created_at, updated_at                   │
-└──────────────────────────────────────────────────┘
+┌──────────────────┐         ┌────────────────────────────────────────────┐
+│  React UI         │         │  NestJS Backend (tictactoe-api, port 3002) │
+│  (thin client)    │         │                                            │
+│  Sends intents:   │──REST──→│  GameController (/api/games)               │
+│  { position: 4 }  │         │    └─ class-validator DTOs + ValidationPipe│
+│                   │         │  GameService (business logic orchestrator) │
+│  Renders state    │←────────│    └─ SELECT...FOR UPDATE for concurrency  │
+│  from server      │         │    └─ isValidMove() defense-in-depth       │
+│                   │         │  AiService (wraps LangGraph pipeline)      │
+│  useGameSocket()  │←──WS────│  GameGateway (Socket.IO + Redis adapter)   │
+└──────────────────┘         │  gameLogic.ts (pure, deterministic rules)  │
+                              └─────────────┬──────────────┬───────────────┘
+                                            │              │
+                              ┌─────────────┴──┐  ┌───────┴──────────────┐
+                              │  TypeORM conn    │  │  PostGraphile conn   │
+                              │  (postgres role  │  │  (postgraphile_user  │
+                              │   = full CRUD)   │  │   = SELECT only)     │
+                              └────────┬─────────┘  └──────────┬───────────┘
+                                       └──────────┬────────────┘
+                                            ┌─────┴──────┐    ┌────────────┐
+                                            │ PostgreSQL  │    │   Redis    │
+                                            │ (Docker,    │    │ (Socket.IO │
+                                            │  port 54322)│    │  pub/sub)  │
+                                            └────────────┘    └────────────┘
 ```
 
 #### Architecture decisions and WHY
@@ -165,23 +209,31 @@ The LLM picks a position, but `gameLogic.ts` enforces rules. LLMs are probabilis
 In `moveGenerationNode`, on failure the prompt gets augmented: `"Your previous response was invalid: [errors]. You MUST respond with ONLY a single digit from: [available]"`. The LLM self-corrects on the next attempt. This is a core pattern for any LLM integration — you can't guarantee the first response is valid, so you design for graceful retry. The key insight: retries aren't just "try again" — they include _why_ the last attempt failed, giving the model information to correct itself.
 
 **Why defense-in-depth validation?**
-The pipeline's `moveValidationNode` validates the move. Then the API route calls `isValidMove()` again independently. Why both? In production AI systems, you never trust a single validation layer. The pipeline might have a bug. The LLM might find an edge case your parsing didn't handle. Defense-in-depth means a failure in one layer gets caught by the next. Look at the API route — it validates the board shape on input (`isValidBoard`), validates the game status, validates the pipeline output, and validates the final move. Four checks for one request.
+The pipeline's `moveValidationNode` validates the move. Then `AiService.generateMove()` calls `isValidMove()` independently. Then `GameService.makeMove()` validates _again_ before applying. Why three layers? In production AI systems, you never trust a single validation layer. The pipeline might have a bug. The LLM might find an edge case your parsing didn't handle. Defense-in-depth means a failure in one layer gets caught by the next. Each layer assumes the previous one might be wrong.
 
-**Why frontend as source of truth for in-progress state?**
-The game is latency-sensitive — you can't round-trip to the DB for every move. React state (`useState<GameState>`) owns the current game. Save to PostgreSQL only on completion via `saveCompletedGame()`. This is a common pattern for real-time UX + async persistence: optimistic UI with eventual consistency. The tradeoff is that if the tab crashes mid-game, you lose the game state. Acceptable for a game; in a chat widget, you'd persist messages incrementally.
+**Why backend as source of truth?**
+Three forces require server authority: (a) PvP requires shared truth — two clients cannot both be the authority, (b) an adversarial client can submit any board state if the frontend is the authority, (c) concurrent moves in PvP need `SELECT...FOR UPDATE` — you cannot do pessimistic locking in client state. The frontend sends _intents_ (`{ position: 4 }`), not state. The backend validates, applies, and returns the canonical game state. This is the same trust model any multi-user system needs — Inkeep's multi-tenant agents require server-side validation of tenant boundaries for the same reason.
+
+**Why pessimistic locking (`SELECT...FOR UPDATE`)?**
+Two PvP players might click simultaneously. Without locking, both reads see the same board, both moves appear valid, and one overwrites the other — a classic race condition. Pessimistic locking serializes access: the first `SELECT...FOR UPDATE` locks the row, the second waits until the first transaction commits. This is simpler than optimistic locking (version column + retry) for low-contention scenarios — a game has at most 2 concurrent players. For high-contention (100 users editing the same document), you'd reach for optimistic locking instead.
+
+**Why per-game UUID tokens instead of full auth?**
+Full authentication (JWT, sessions, OAuth) adds significant infrastructure for a feature that doesn't need user identity — it only needs turn enforcement. Per-game tokens (`playerXToken`, `playerOToken`) stored in localStorage prove "I am the player who created/joined this game." The token is sent via `X-Player-Token` header. This is scope-appropriate security: the threat model is "prevent the wrong player from moving on the wrong turn," not "prevent unauthorized access to user accounts." If you later need user accounts (leaderboards, game history tied to a user), tokens upgrade to JWTs naturally — the header mechanism stays the same.
+
+**Why Redis adapter for Socket.IO?**
+Without Redis, Socket.IO rooms are local to a single NestJS process. If you deploy 3 instances behind a load balancer, Player X connects to instance 1, Player O to instance 2. Instance 1 broadcasts to its local room, but Player O never receives it. The Redis adapter (`@socket.io/redis-adapter`) uses Redis pub/sub: when any instance broadcasts, Redis fans it out to all instances. The room becomes cluster-wide. This is a one-line change (`server.adapter(createAdapter(pubClient, subClient))`) that transforms a single-process architecture into a horizontally scalable one.
+
+**Why PostgreSQL roles for PostGraphile security?**
+PostGraphile auto-generates GraphQL mutations from the database schema — without restrictions, `createGame` and `updateGame` mutations would be exposed, letting any client write arbitrary game state directly to the database and bypass all validation. The solution: a `postgraphile_user` role with `GRANT SELECT` only, `REVOKE INSERT, UPDATE, DELETE`. PostGraphile connects with this restricted role. TypeORM connects with the full-access `postgres` role. Two connections, two roles, two permission sets. All writes go through `GameService` (which validates). This is defense-in-depth at the database layer — even if someone discovers the GraphQL endpoint, they cannot mutate data.
+
+**Why two data access paths (REST + GraphQL)?**
+PostGraphile's auto-generated GraphQL is excellent for flexible reads — game history with arbitrary filtering, pagination, field selection. It stays for read queries. REST endpoints via `GameController` handle all game actions (create, move, join) because they need business logic orchestration (validation, AI pipeline, WebSocket broadcast) that doesn't fit PostGraphile's declarative model. This is a pragmatic split: use the auto-generated API where it's sufficient, add custom endpoints where you need business logic.
 
 **Why flat array vs. 2D grid for the board?**
 The board is `Board = [CellValue x 9]` — a flat 9-element tuple, not a 3x3 matrix. Why? Serialization simplicity: JSON, GraphQL, and LLM prompts all handle flat arrays natively. A single index (0-8) is unambiguous for the LLM — no confusion about `(row, col)` ordering. Win checking uses a constant `WIN_LINES` array of index triples — cleaner than nested loops. The flat representation also makes the type literal: TypeScript enforces exactly 9 elements at the type level.
 
-**Why a separate API service with PostGraphile?**
-The persistence layer is a standalone NestJS service (`tictactoe-api`) running PostGraphile, which auto-generates a complete GraphQL API from the PostgreSQL schema. No custom resolvers — the `game` table's columns become GraphQL types, and CRUD mutations are generated automatically. Why this pattern?
-
-- **Database-first development:** Define the schema in PostgreSQL (via TypeORM migrations), and the API writes itself. Adding a column to the `game` table immediately exposes it in GraphQL. Zero boilerplate.
-- **Separation of AI and persistence services:** The Next.js app handles the AI pipeline (LangGraph + LLM). The NestJS app handles data persistence. Neither depends on the other's internals. You can scale, deploy, and debug them independently.
-- **Schema-driven API is the Inkeep pattern:** Inkeep's architecture is heavily schema-driven — their agents SDK generates configuration from type definitions, their visual builder and code SDK share a schema. PostGraphile is the same principle applied to data access.
-
 **Why Docker for the database?**
-PostgreSQL runs in a Docker container (`docker-compose up -d`) so every developer gets an identical database with zero local installation. The schema is managed by TypeORM migrations, so `npm run migration:run` reproduces the exact production schema locally. Containerized databases are table stakes for reproducible local dev — no "works on my machine" issues, no version mismatches, and CI can spin up the same container for integration tests.
+PostgreSQL and Redis both run in Docker containers (`docker-compose up -d`) so every developer gets identical infrastructure with zero local installation. The schema is managed by TypeORM migrations — `pnpm typeorm:migration:run` reproduces the exact production schema locally. Containerized infrastructure is table stakes for reproducible local dev — no "works on my machine" issues, no version mismatches, and CI can spin up the same containers for integration tests.
 
 ## 4. Implementation Phase — React/Next.js Patterns
 

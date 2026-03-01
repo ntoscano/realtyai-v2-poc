@@ -1,11 +1,8 @@
 import {
-	OnGatewayInit,
 	SubscribeMessage,
 	WebSocketGateway,
 	WebSocketServer,
 } from '@nestjs/websockets';
-import { createAdapter } from '@socket.io/redis-adapter';
-import Redis from 'ioredis';
 import { Server, Socket } from 'socket.io';
 
 import { GameStateDto } from './dto/game-state.dto';
@@ -14,19 +11,9 @@ import { GameStateDto } from './dto/game-state.dto';
 	namespace: '/game',
 	cors: { origin: '*' },
 })
-export class GameGateway implements OnGatewayInit {
+export class GameGateway {
 	@WebSocketServer()
 	server: Server;
-
-	afterInit(server: Server) {
-		const redisHost = process.env.REDIS_HOST || 'localhost';
-		const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-
-		const pubClient = new Redis({ host: redisHost, port: redisPort });
-		const subClient = pubClient.duplicate();
-
-		server.adapter(createAdapter(pubClient, subClient));
-	}
 
 	@SubscribeMessage('joinGame')
 	handleJoinGame(client: Socket, data: { gameId: string }) {

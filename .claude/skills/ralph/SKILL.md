@@ -98,6 +98,21 @@ Each criterion must be something Ralph can CHECK, not something vague.
 - "Good UX"
 - "Handles edge cases"
 
+### Error cases are acceptance criteria, not afterthoughts:
+
+For stories involving API endpoints or state mutations, include criteria for error cases:
+
+**Good (covers both happy path and errors):**
+
+- "POST /api/games/:id/move returns updated game state for valid move"
+- "POST /api/games/:id/move returns 400 for occupied position"
+- "POST /api/games/:id/move returns 403 if X-Player-Token does not match current turn"
+- "POST /api/games/:id/move returns 400 if game is not in_progress"
+
+**Insufficient (happy path only):**
+
+- "Player can make a move"
+
 ### Always include as final criterion:
 
 ```
@@ -128,6 +143,26 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+
+---
+
+## Notes Field: Production Context
+
+Use the `notes` field to give Ralph production context that is NOT an acceptance criterion but informs implementation:
+
+### Good notes:
+
+- "This endpoint modifies shared state — use a transaction with pessimistic locking"
+- "Validate authorization via X-Player-Token header, not just authentication"
+- "Return proper HTTP status codes: 400 for invalid input, 404 for not found, 403 for wrong player"
+- "This is a defense-in-depth validation — even though the pipeline validates, the service should validate independently"
+
+### When to add notes:
+
+- The story involves concurrent access to shared database rows
+- The story involves user input that needs server-side validation
+- The story has security implications (authorization, role separation)
+- The story has error cases that the acceptance criteria don't fully capture
 
 ---
 
@@ -264,4 +299,6 @@ Before writing prd.json, verify:
 - [ ] Every story has "Typecheck passes" as criterion
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
+- [ ] Stories with APIs or shared state include error-case acceptance criteria
+- [ ] Notes field includes concurrency/security context where applicable
 - [ ] No story depends on a later story
