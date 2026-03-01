@@ -1,66 +1,86 @@
 'use client';
 
-import { GameHistorySidebar } from '@/components/GameHistorySidebar';
-import { createGame } from '@/lib/api/gameApi';
-import { useGameHistory } from '@/lib/graphql/hooks';
+import { GameBoard } from '@/components/GameBoard';
+import { GameStatus } from '@/components/GameStatus';
+import { ModeToggle } from '@/components/ModeToggle';
+import { NewGameButton } from '@/components/NewGameButton';
+import { createGame, makeMove } from '@/lib/api/gameApi';
+import type { Board } from '@/types/game';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+
+const EMPTY_BOARD: Board = [
+	null,
+	null,
+	null,
+	null,
+	null,
+	null,
+	null,
+	null,
+	null,
+];
 
 export default function Home() {
 	const router = useRouter();
+	const [board, setBoard] = useState<Board>(EMPTY_BOARD);
+	const [isCreating, setIsCreating] = useState(false);
+	const [isAiThinking, setIsAiThinking] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const { games, loading } = useGameHistory();
-	const creatingRef = useRef(false);
 
-	useEffect(() => {
-		if (creatingRef.current) return;
-		creatingRef.current = true;
+	const handleCellClick = useCallback(
+		async (position: number) => {
+			if (isCreating) return;
 
-		async function startGame() {
+			// Optimistic: show X immediately
+			const newBoard: Board = [...EMPTY_BOARD];
+			newBoard[position] = 'X';
+			setBoard(newBoard);
+
+			setIsCreating(true);
+			setIsAiThinking(true);
+			setError(null);
+
 			try {
 				const response = await createGame('ai');
 				localStorage.setItem(
 					`playerToken-${response.game.id}`,
 					response.playerToken,
 				);
+				await makeMove(response.game.id, position, response.playerToken);
 				router.push(`/game/${response.game.id}`);
 			} catch {
-				setError('Failed to create game. Please try again.');
-				creatingRef.current = false;
+				setBoard(EMPTY_BOARD);
+				setIsCreating(false);
+				setIsAiThinking(false);
+				setError('Failed to start game. Please try again.');
 			}
-		}
-		startGame();
-	}, [router]);
+		},
+		[router, isCreating],
+	);
 
 	return (
-		<main className="min-h-screen bg-background p-8">
-			<div className="mx-auto grid max-w-4xl grid-cols-1 gap-8 md:grid-cols-3">
-				<div className="flex flex-col items-center gap-6 md:col-span-2">
-					<h1 className="text-3xl font-bold">AI Tic-Tac-Toe</h1>
-					{error ? (
-						<div className="flex flex-col items-center gap-4">
-							<p className="text-sm text-destructive">{error}</p>
-							<button
-								onClick={() => {
-									setError(null);
-									creatingRef.current = false;
-									window.location.reload();
-								}}
-								className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
-							>
-								Try Again
-							</button>
-						</div>
-					) : (
-						<p className="text-lg text-muted-foreground animate-pulse">
-							Creating new game...
-						</p>
-					)}
-				</div>
-				<div className="col-span-1">
-					<GameHistorySidebar games={games} loading={loading} />
-				</div>
-			</div>
-		</main>
+		<div className="flex flex-col items-center gap-6">
+			<h1 className="text-3xl font-bold">AI Tic-Tac-Toe</h1>
+			<ModeToggle
+				currentMode="ai"
+				onSelectMode={(mode) => {
+					if (mode === 'pvp') router.push('/x');
+				}}
+			/>
+			<GameStatus
+				status="in_progress"
+				isAiThinking={isAiThinking}
+				mode="ai"
+				currentTurn="X"
+			/>
+			<GameBoard
+				board={board}
+				onCellClick={handleCellClick}
+				disabled={isCreating}
+			/>
+			{error && <p className="text-sm text-destructive">{error}</p>}
+			<NewGameButton onClick={() => window.location.reload()} />
+		</div>
 	);
 }

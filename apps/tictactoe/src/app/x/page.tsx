@@ -47,7 +47,7 @@ export default function PlayerXPage() {
 
 	if (error) {
 		return (
-			<main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+			<div className="flex flex-col items-center justify-center gap-4">
 				<p className="text-lg text-destructive">{error}</p>
 				<Button
 					onClick={() => {
@@ -58,17 +58,17 @@ export default function PlayerXPage() {
 				>
 					Try Again
 				</Button>
-			</main>
+			</div>
 		);
 	}
 
 	if (!gameId) {
 		return (
-			<main className="flex min-h-screen items-center justify-center bg-background">
+			<div className="flex items-center justify-center">
 				<p className="text-lg text-muted-foreground animate-pulse">
 					Creating PvP game...
 				</p>
-			</main>
+			</div>
 		);
 	}
 
@@ -77,27 +77,25 @@ export default function PlayerXPage() {
 	}/o?game=${gameId}`;
 
 	return (
-		<main className="min-h-screen bg-background p-8">
-			<div className="mx-auto flex max-w-md flex-col items-center gap-6">
-				<h1 className="text-3xl font-bold">PvP Tic-Tac-Toe</h1>
-				<p className="text-muted-foreground">You are Player X</p>
+		<div className="flex flex-col items-center gap-6">
+			<h1 className="text-3xl font-bold">PvP Tic-Tac-Toe</h1>
+			<p className="text-muted-foreground">You are Player X</p>
 
-				<div className="w-full rounded-lg border p-4">
-					<p className="mb-2 text-sm font-medium">
-						Share this link with Player O:
-					</p>
-					<div className="flex items-center gap-2">
-						<code className="flex-1 rounded bg-muted px-3 py-2 text-sm break-all">
-							{shareLink}
-						</code>
-						<Button onClick={handleCopyLink} variant="outline" size="sm">
-							{copied ? 'Copied!' : 'Copy'}
-						</Button>
-					</div>
+			<div className="w-full rounded-lg border p-4">
+				<p className="mb-2 text-sm font-medium">
+					Share this link with Player O:
+				</p>
+				<div className="flex items-center gap-2">
+					<code className="flex-1 rounded bg-muted px-3 py-2 text-sm break-all">
+						{shareLink}
+					</code>
+					<Button onClick={handleCopyLink} variant="outline" size="sm">
+						{copied ? 'Copied!' : 'Copy'}
+					</Button>
 				</div>
-
-				<Button onClick={handleGoToGame}>Go to Game</Button>
 			</div>
-		</main>
+
+			<Button onClick={handleGoToGame}>Go to Game</Button>
+		</div>
 	);
 }

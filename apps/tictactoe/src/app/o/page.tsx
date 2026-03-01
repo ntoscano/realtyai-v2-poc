@@ -49,19 +49,19 @@ function PlayerOContent() {
 
 	if (error) {
 		return (
-			<main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+			<div className="flex flex-col items-center justify-center gap-4">
 				<p className="text-lg text-destructive">{error}</p>
 				<Button onClick={() => router.push('/')}>Go Home</Button>
-			</main>
+			</div>
 		);
 	}
 
 	return (
-		<main className="flex min-h-screen items-center justify-center bg-background">
+		<div className="flex items-center justify-center">
 			<p className="text-lg text-muted-foreground animate-pulse">
 				Joining game...
 			</p>
-		</main>
+		</div>
 	);
 }
 
@@ -69,11 +69,11 @@ export default function PlayerOPage() {
 	return (
 		<Suspense
 			fallback={
-				<main className="flex min-h-screen items-center justify-center bg-background">
+				<div className="flex items-center justify-center">
 					<p className="text-lg text-muted-foreground animate-pulse">
 						Loading...
 					</p>
-				</main>
+				</div>
 			}
 		>
 			<PlayerOContent />
