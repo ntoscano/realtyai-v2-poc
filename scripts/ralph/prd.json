@@ -177,7 +177,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 9,
-			"passes": false,
+			"passes": true,
 			"notes": "Available shifts: filter by qualification on the server via query param. My Shifts: fetch booked shifts and filter client-side where booking.professionalId matches selected professional. Error messages should appear inline near the shift that failed, then auto-clear or persist until dismissed."
 		},
 		{

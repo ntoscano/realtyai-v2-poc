@@ -190,3 +190,25 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Form state should reset after successful submission, and shift list should refetch
   - useCallback for fetchShifts ensures it's a stable dependency for useEffect when selectedFacilityId changes
 ---
+
+## 2026-03-01 - US-009
+- Implemented professional dashboard page with professional selector, available shifts, booking, and my shifts sections
+- Files modified:
+  - src/app/professional/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a professional (populated from GET /api/professionals on mount, shows qualification)
+  - Available shifts section: filtered by selected professional's qualification via server query param
+  - Each available shift shows: facility name, qualification badge, time window, pay rate, Book button
+  - Book button calls POST /api/shifts/:id/book with selected professional's ID
+  - On success: refetches both available and booked shifts
+  - Inline error messages per shift for 409 (already booked) and 400 (qualification mismatch)
+  - My Shifts section: fetches booked shifts filtered client-side by professionalId
+  - Loading and error states handled
+- Typecheck passes, lint passes
+- **Learnings for future iterations:**
+  - Use per-shift error state (Record<string, string>) for inline error messages on individual shift rows
+  - Use per-shift booking-in-progress state (Record<string, boolean>) to disable individual Book buttons during requests
+  - Fetch available and booked shifts in parallel with Promise.all for better performance
+  - Import ApiError type from shiftApi.ts to properly type error handling in catch blocks
+  - Professional selector shows qualification in parentheses (e.g., "Alice Johnson (RN)") for better UX
+---
