@@ -155,7 +155,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 8,
-			"passes": false,
+			"passes": true,
 			"notes": "Use Badge component for status (variant: default/green for open, secondary/blue for booked). Pay rate display: (payRateCents / 100).toFixed(2). Fetch shifts whenever selected facility changes. Form resets after successful submission."
 		},
 		{

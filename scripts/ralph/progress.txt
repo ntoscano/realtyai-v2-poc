@@ -26,7 +26,8 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - Frontend port convention: 2025 = tictactoe, 2026 = shift-ui
 - Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
 - shadcn/ui components go in `src/components/ui/` — copy badge, button, card from tictactoe as baseline
-- No select.tsx in tictactoe — use native HTML select or create one for shift-ui dashboards
+- No select.tsx in tictactoe — use native HTML select styled with `border-input bg-background px-3 py-2 text-sm rounded-md` to match theme
+- Backend GET /api/shifts does not support facilityId filter — filter client-side after fetching with status=all
 ---
 
 ## 2026-03-01 - US-001
@@ -167,4 +168,25 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - No select.tsx component exists in tictactoe — will need native HTML selects or a custom component for the dashboard dropdowns
   - The API error handling pattern extracts `body.message` from JSON responses and attaches `status` code as a property on the Error object — useful for distinguishing 400/409/404 errors in the UI
   - Placeholder pages for /facility and /professional routes ensure Next.js routing works immediately
+---
+
+## 2026-03-01 - US-008
+- Implemented facility dashboard page with facility selector, shift creation form, and shift list
+- Files modified:
+  - src/app/facility/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a facility (populated from GET /api/facilities on mount)
+  - Form to post new shifts: qualification dropdown (CNA/LPN/RN), datetime-local inputs, pay rate in dollars (converted to cents)
+  - Shift list filtered by selected facility (fetched with status=all, filtered client-side by facilityId)
+  - Status badges: default variant for 'open', secondary variant for 'booked'
+  - Pay rate displayed as dollars (payRateCents / 100).toFixed(2)
+  - Professional name shown for booked shifts
+  - Loading and error states handled
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Backend GET /api/shifts does not support filtering by facilityId — must fetch with status=all and filter client-side
+  - Use native HTML select elements (no shadcn Select component available) — style with border-input bg-background classes to match theme
+  - datetime-local input type works well for shift start/end times — converts to ISO string via new Date(value).toISOString()
+  - Form state should reset after successful submission, and shift list should refetch
+  - useCallback for fetchShifts ensures it's a stable dependency for useEffect when selectedFacilityId changes
 ---
