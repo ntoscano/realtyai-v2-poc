@@ -212,3 +212,25 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Import ApiError type from shiftApi.ts to properly type error handling in catch blocks
   - Professional selector shows qualification in parentheses (e.g., "Alice Johnson (RN)") for better UX
 ---
+
+## 2026-03-01 - US-010
+- End-to-end verification across both dashboards — all acceptance criteria verified
+- No code changes needed — all functionality works correctly
+- Verification steps completed:
+  1. Facility dashboard: selected Sunrise Nursing Home, posted CNA shift ($25/hr), confirmed listed as 'open'
+  2. Professional dashboard: selected Bob Smith (CNA), saw CNA shift in available list, booked it successfully (200)
+  3. Professional dashboard: shift moved to My Shifts section (filtered by professionalId)
+  4. Facility dashboard: refreshed shows shift as 'booked' with Bob Smith displayed
+  5. Professional dashboard: David Brown (CNA) — booked CNA shift NOT in available list (0 open CNA shifts)
+  6. Professional dashboard: Alice Johnson (RN) — CNA shift does NOT appear (qualification filter works)
+  7. Facility dashboard: posted RN shift at Metro General Hospital ($45/hr)
+  8. Professional dashboard as Alice Johnson (RN): saw the RN shift, booked it successfully
+  9. Both dashboards reflect correct state: CNA booked by Bob, RN booked by Alice
+  10. Extra verifications: duplicate booking → 409 "Shift is already booked", qualification mismatch → 400
+- Frontend pages all respond with 200: /, /facility, /professional
+- Typecheck passes on both shift-api and shift-ui
+- **Learnings for future iterations:**
+  - Full E2E verification via curl is reliable for testing API + state transitions without browser tools
+  - The client-side filtering pattern (fetch all, filter by facilityId or professionalId) works well for POC scale
+  - All error codes are consistent: 409 for duplicate booking, 400 for qualification mismatch, 404 for missing entities
+---

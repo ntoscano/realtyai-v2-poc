@@ -197,7 +197,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 10,
-			"passes": false,
+			"passes": true,
 			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: shift-api on 3003, shift-ui on 2026. Database must be seeded."
 		}
 	]
