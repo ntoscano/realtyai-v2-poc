@@ -59,7 +59,7 @@
 				"Typecheck passes"
 			],
 			"priority": 3,
-			"passes": false,
+			"passes": true,
 			"notes": "Use @Controller('api') prefix so routes are /api/shifts, /api/facilities, /api/professionals. Use query builder for findAll() to support optional filters. Left join booking and professional so response includes booking info when shift is booked. See docs/clipboard-health-implementation-plan.md for detailed service method specs."
 		},
 		{

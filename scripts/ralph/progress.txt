@@ -14,6 +14,9 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
 - New NestJS apps MUST have `.eslintrc.js` copied from tictactoe-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
 - Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
+- Controllers use `@Controller('api')` prefix; DTO files go in `dto/` subdirectory under each module
+- Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
+- Left join related entities (booking + professional) in shift queries to include nested data
 ---
 
 ## 2026-03-01 - US-001
@@ -51,4 +54,21 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Cross-module entity imports use relative paths (e.g., booking.entity imports from `../../shift/entities/shift.entity`)
   - `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy to ensure correct FK column naming
   - `bookedAt` uses `default: () => 'NOW()'` (function form) for DB-level default
+---
+
+## 2026-03-01 - US-003
+- Implemented Shift CRUD endpoints: create, list with filters, get by id, list facilities, list professionals
+- Files created:
+  - src/modules/shift/dto/create-shift.dto.ts (class-validator: IsUUID, IsIn, IsDateString, IsInt, Min)
+  - src/modules/shift/shift.service.ts (create, findAll, findOne, listFacilities, listProfessionals)
+  - src/modules/shift/shift.controller.ts (@Controller('api') with 5 endpoints)
+- Files modified:
+  - src/modules/shift/shift.module.ts (wired TypeOrmModule.forFeature, controller, service, exports)
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Use `@Controller('api')` prefix so routes are /api/shifts, /api/facilities, /api/professionals (all under one controller)
+  - Use createQueryBuilder for findAll() to support optional where clauses via .andWhere() pattern
+  - Left join booking + professional in shift queries so response includes booking info when shift is booked
+  - Service validates business rules (facility exists, endTime > startTime) and throws NestJS exceptions (NotFoundException, BadRequestException)
+  - The prettier/prettier eslint rule fails on decorator files due to root @trivago/prettier-plugin-sort-imports — this is pre-existing and not a blocker (same in tictactoe-api)
 ---
