@@ -1,0 +1,348 @@
+## Codebase Patterns
+- WebSocket gateway at `apps/tictactoe-api/src/modules/game/game.gateway.ts` — uses @nestjs/websockets v10 + @nestjs/platform-socket.io v10 (must match NestJS core version)
+- Redis adapter configured in `afterInit()` via OnGatewayInit lifecycle hook — uses ioredis pub/sub clients with `pubClient.duplicate()` for sub client
+- GameGateway is a provider in GameModule, injected into GameService for broadcasting PvP game updates
+- Use SnakeNamingStrategy: camelCase in TypeScript -> snake_case in DB columns (automatic via TypeORM config)
+- Migrations are in `apps/tictactoe-api/src/migrations/` with timestamp prefix
+- Run migrations with `pnpm typeorm:migration:run` from `apps/tictactoe-api/`
+- PostgreSQL on port 54322 (not default 5432) to avoid conflicts
+- Game entity at `apps/tictactoe-api/src/modules/game/game.entity.ts`
+- Types (CellValue, GameMove, GameStatus, GameMode) are defined in the entity file AND in `apps/tictactoe-api/src/lib/game/types.ts`
+- Pure game logic functions in `apps/tictactoe-api/src/lib/game/gameLogic.ts` — import types from `./types`
+- Typecheck: `pnpm typecheck` from `apps/tictactoe-api/`
+- Pre-commit hooks run eslint and prettier via lint-staged
+- DTOs in `apps/tictactoe-api/src/modules/game/dto/` — use class-validator for validation
+- GameService has `toGameStateDto()` private method to map entity -> DTO (does NOT expose player tokens)
+- GameController uses `@Controller('api/games')` prefix
+- Use `@UsePipes(new ValidationPipe({ whitelist: true }))` per-endpoint for input validation
+- For transactional operations with row locking: inject `DataSource`, create queryRunner, use `setLock('pessimistic_write')` for SELECT FOR UPDATE
+- Board is JSONB in DB — cast to `Board` type from `../../lib/game/types` when passing to game logic functions
+- AI module at `apps/tictactoe-api/src/modules/ai/` — AiService.generateMove(board) invokes LangGraph pipeline
+- AI files use kebab-case filenames: move-graph.ts, graph-state.ts, move-validator.ts, move-prompt.ts, llm.ts, nodes.ts
+- NestJS upgraded to v10, TypeScript upgraded to v5.9 — required for compatibility with zod v4 (transitive dep from @langchain/core)
+- AWS Bedrock env vars: AI_AWS_BEDROCK_ACCESS_KEY_ID, AI_AWS_BEDROCK_SECRET_ACCESS_KEY, AI_AWS_BEDROCK_REGION
+- Two DB connections: TypeORM uses postgres superuser (full access), PostGraphile uses postgraphile_user (SELECT only) — configured in separate config files (typeorm.ts vs graphile.ts)
+- PostGraphile credentials: POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD env vars (defaults: postgraphile_user / postgraphile)
+
+# Ralph Progress Log
+Started: Fri Feb 27 15:47:49 PST 2026
+---
+
+## 2026-02-27 16:00 - US-001
+- Implemented database schema migration for game mode and turn tracking
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.entity.ts` - Added mode, currentTurn, playerXToken, playerOToken columns with types
+  - `apps/tictactoe-api/src/migrations/1772236312254-AddGameModeAndTurnTracking.ts` - New migration: truncates game data, adds 4 new columns
+- **Learnings for future iterations:**
+  - SnakeNamingStrategy handles camelCase -> snake_case automatically, but explicit `name` overrides in `@Column` decorators take precedence (e.g., `board_state`)
+  - Migration ran successfully with TRUNCATE before ALTER TABLE to avoid default value issues on existing rows
+  - Typecheck and lint pass cleanly
+---
+
+## 2026-02-27 16:15 - US-002
+- Copied game logic and shared types to backend
+- Files changed:
+  - `apps/tictactoe-api/src/lib/game/types.ts` - Created with CellValue, Board (9-element tuple), GameMove, GameStatus, GameMode types
+  - `apps/tictactoe-api/src/lib/game/gameLogic.ts` - Copied verbatim from frontend, updated import from `@/types/game` to `./types`
+- **Learnings for future iterations:**
+  - The frontend types file at `apps/tictactoe/src/types/game.ts` has extra types (GameState, GameSummary) not needed in backend — only copied the shared subset
+  - The entity file already defines CellValue, GameMove, GameStatus, GameMode — there is now duplication between entity types and lib/game/types.ts. Future stories may want to consolidate by importing from lib/game/types.ts in the entity
+  - All 9 pure functions are available: checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay
+---
+
+## 2026-02-27 16:35 - US-003
+- Created GameModule with POST /api/games endpoint for creating games
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/dto/create-game.dto.ts` - CreateGameDto with @IsIn validation for mode field
+  - `apps/tictactoe-api/src/modules/game/dto/game-state.dto.ts` - GameStateDto and CreateGameResponseDto (game state + playerToken)
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - GameService with createGame() and toGameStateDto() helper
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - GameController with POST /api/games
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - GameModule importing TypeOrmModule.forFeature([Game])
+  - `apps/tictactoe-api/src/app.module.ts` - Registered GameModule in AppModule imports
+  - `apps/tictactoe-api/package.json` - Added class-validator and class-transformer dependencies
+- **Learnings for future iterations:**
+  - class-validator and class-transformer were already listed in package.json but not installed — pnpm install pulled them in
+  - Entity types (CellValue, GameMove, GameStatus, GameMode) are imported from game.entity.ts in DTOs — keeps a single source of truth within the game module
+  - GameStateDto maps boardState -> board to match the frontend's expected API shape
+  - playerToken is returned as a separate top-level field in CreateGameResponseDto, not part of GameStateDto
+  - ValidationPipe with whitelist:true strips unknown properties from request body
+---
+
+## 2026-02-27 17:00 - US-004
+- Added GET /api/games/:id endpoint to fetch game state
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added getGame() method with NotFoundException for missing games
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get(':id') endpoint returning GameStateDto
+- **Learnings for future iterations:**
+  - toGameStateDto() already strips playerXToken and playerOToken — no extra work needed for security
+  - NotFoundException from @nestjs/common auto-returns 404 with descriptive JSON message
+  - Pre-commit eslint decorator parsing errors are pre-existing and not caused by changes — lint-staged still passes
+---
+
+## 2026-02-27 17:20 - US-005
+- Added POST /api/games/:id/move endpoint for making moves with full game logic validation
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/dto/make-move.dto.ts` - Created MakeMoveDto with @IsInt, @Min(0), @Max(8) validation on position
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added makeMove() method with transaction, SELECT FOR UPDATE, game logic validation
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/move') endpoint with ValidationPipe
+- **Learnings for future iterations:**
+  - TypeORM `DataSource` is injectable without @Inject decorator — NestJS auto-resolves it from the TypeORM module
+  - Use `queryRunner.manager.getRepository(Game).createQueryBuilder('game').setLock('pessimistic_write')` for SELECT ... FOR UPDATE
+  - Board stored as JSONB in DB needs `as Board` cast when using with game logic functions expecting the 9-element tuple type
+  - Game logic functions imported from `../../lib/game/gameLogic` — relative path from modules/game/ directory
+  - `moveNumber` is 1-indexed: `game.moves.length + 1` before adding the new move
+  - Winner field on game over: set to 'X' or 'O' for wins, null for draws; currentTurn only flips on in_progress continuation
+---
+
+## 2026-02-27 17:40 - US-006
+- Added GET /api/games endpoint to list recent games with optional limit
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added listGames(limit) method using repository.find with order and take
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get() handler with @Query('limit') param, placed before @Get(':id') to avoid route conflicts
+- **Learnings for future iterations:**
+  - Route order matters in NestJS controllers: @Get() must come before @Get(':id') or the parameterized route will catch all requests
+  - Query params come as strings — parse to int before passing to service, with fallback to undefined for default
+  - Lint auto-fixed `limit: number = 20` to `limit = 20` (type inference from default value)
+  - toGameStateDto() already strips player tokens so listGames response is safe by default
+---
+
+## 2026-02-27 18:00 - US-007
+- Added POST /api/games/:id/join endpoint for Player O to join PvP games
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added joinGame() method with mode validation, conflict check, and playerOToken generation
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/join') endpoint returning CreateGameResponseDto
+- **Learnings for future iterations:**
+  - ConflictException from @nestjs/common auto-returns 409 with descriptive JSON message — same pattern as NotFoundException for 404
+  - joinGame reuses CreateGameResponseDto (game state + playerToken) — same response shape as createGame since both return a token to the caller
+  - No ValidationPipe needed on join endpoint since there's no request body to validate
+  - Route placed before :id/move to maintain clean route ordering (though NestJS resolves literal segments before params so it works either way)
+---
+
+## 2026-02-27 18:30 - US-008
+- Migrated AI pipeline to NestJS backend
+- Files changed:
+  - `apps/tictactoe-api/src/modules/ai/ai.module.ts` - Created AiModule exporting AiService
+  - `apps/tictactoe-api/src/modules/ai/ai.service.ts` - Created AiService with generateMove(board) method, defense-in-depth isValidMove check
+  - `apps/tictactoe-api/src/modules/ai/move-graph.ts` - Copied from frontend, updated imports to relative paths
+  - `apps/tictactoe-api/src/modules/ai/nodes.ts` - Copied from frontend, updated imports: `../../lib/game/gameLogic` and local AI modules
+  - `apps/tictactoe-api/src/modules/ai/graph-state.ts` - Copied from frontend, updated Board import to `../../lib/game/types`
+  - `apps/tictactoe-api/src/modules/ai/move-validator.ts` - Copied verbatim (no import changes needed, only uses zod)
+  - `apps/tictactoe-api/src/modules/ai/llm.ts` - Copied verbatim (uses @langchain/aws, env vars for credentials)
+  - `apps/tictactoe-api/src/modules/ai/move-prompt.ts` - Copied verbatim (uses @langchain/core/prompts)
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added AiModule to imports
+  - `apps/tictactoe-api/package.json` - Added @langchain/aws, @langchain/core, @langchain/langgraph, zod; upgraded NestJS to v10, TypeScript to v5.9
+  - `apps/tictactoe-api/.env.local` - Added AI_AWS_BEDROCK_* env vars
+  - `apps/tictactoe-api/.env.example` - Added AI_AWS_BEDROCK_* env vars
+- **Learnings for future iterations:**
+  - Zod v4 (4.3.6) is pulled in as a transitive dep from @langchain/core — its .d.cts files are incompatible with TypeScript 4.9 (skipLibCheck doesn't skip .d.cts). Must use TypeScript 5.x.
+  - NestJS 8's @Inject/@InjectRepository parameter decorator types are incompatible with TypeScript 5.x (TS1239 error). Upgrading to NestJS 10 fixes this.
+  - The NestJS v8 -> v10 + TS 4.9 -> 5.9 upgrade was necessary for the langchain dependency chain: @langchain/core -> zod v4 -> requires TS 5.x -> requires NestJS 10
+  - AI files use kebab-case filenames in backend (move-graph.ts vs moveGraph.ts in frontend) to match backend conventions
+  - zod@3.25.32 is installed as direct dependency for the move-validator.ts; zod@4.3.6 exists as transitive from @langchain/core
+  - AiService wraps the LangGraph pipeline with a defense-in-depth isValidMove() check after AI generates a move
+---
+
+## 2026-02-27 19:00 - US-009
+- Integrated AI move into makeMove endpoint — after human move in AI mode, backend auto-triggers AI counter-move
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected AiService, added AI move logic after human move in AI mode, added InternalServerErrorException for AI failures
+- **Learnings for future iterations:**
+  - AiService is already available in GameModule via AiModule import (set up in US-008) — just needs constructor injection in GameService
+  - AI always plays 'O' — no need to parameterize the player for AI moves
+  - The AI move block only fires when `game.mode === 'ai' && game.status === 'in_progress'` — this means it correctly skips when the human move already ends the game (X wins or draw)
+  - Both human and AI moves are committed in the same transaction — if AI fails, the whole transaction rolls back cleanly
+  - `catch {}` (empty catch binding) is valid in TypeScript 5.9 — no need for `catch (_error)`
+  - The response bundles both moves so frontend gets complete state in one round trip (no separate AI endpoint needed)
+---
+
+## 2026-02-27 20:00 - US-010
+- Added PvP player token validation to makeMove endpoint
+- Files changed:
+  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added `@Headers('x-player-token')` param to makeMove, passes to service
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added `playerToken` param to makeMove(), PvP token validation with ForbiddenException
+- **Learnings for future iterations:**
+  - `@Headers('x-player-token')` returns `string | undefined` — NestJS auto-extracts the header value by name
+  - ForbiddenException from @nestjs/common auto-returns 403 — same pattern as NotFoundException (404), ConflictException (409), BadRequestException (400)
+  - Token validation is placed after the `in_progress` check but before `isValidMove` — order matters for meaningful error messages
+  - AI mode skips token validation entirely (guard clause: `if (game.mode === 'pvp')`) — human is always X in AI mode so no token needed
+  - `ConflictException` was already imported but unused warning didn't trigger because lint-staged scopes to changed files
+---
+
+## 2026-02-27 20:30 - US-011
+- Created frontend REST API client at apps/tictactoe/src/lib/api/gameApi.ts
+- Files changed:
+  - `apps/tictactoe/src/lib/api/gameApi.ts` - New file: fetch-based API client with createGame, getGame, makeMove, joinGame, listGames functions
+  - `apps/tictactoe/.env.example` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
+  - `apps/tictactoe/.env.local` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
+- **Learnings for future iterations:**
+  - Frontend types for API responses are defined locally in gameApi.ts (GameStateDto, CreateGameResponse) rather than importing from backend — keeps frontend decoupled from backend module structure
+  - The backend GameStateDto has `board: CellValue[]` (array) while frontend Game types use `Board` (9-element tuple) — consuming code may need to cast
+  - `createdAt` and `updatedAt` are typed as `string` in frontend DTO (JSON serializes dates as ISO strings), not `Date` as in backend DTO
+  - Generic `apiFetch<T>()` helper centralizes error handling with status code + response text in error message
+  - X-Player-Token header is only included when playerToken is provided — works for both AI mode (no token) and PvP mode (with token)
+  - .env.local is NOT committed (contains credentials) — only .env.example is committed
+---
+
+## 2026-02-27 21:00 - US-012
+- Created unified game board page at /game/[id] that loads game by ID and handles moves via REST API
+- Files changed:
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - New 'use client' page: fetches game state via getGame(), renders GameBoard/GameStatus/NewGameButton, handles moves via makeMove() API, reads playerToken from localStorage
+- **Learnings for future iterations:**
+  - `useParams<{ id: string }>()` from next/navigation provides typed dynamic route params in Next.js app router
+  - GameStateDto.board is `CellValue[]` (array) but GameBoard expects `Board` (9-element tuple) — cast with `as Board`
+  - AI mode: set isAiThinking=true before makeMove call since the response bundles both human and AI moves (one round trip)
+  - PvP mode: read playerToken from localStorage with key `playerToken-{gameId}` — this is set by the create/join pages
+  - NewGameButton navigates back to `/` (AI) or `/x` (PvP) depending on game mode
+  - Error handling: check for '404' in error message for game-not-found, show generic error for other failures
+---
+
+## 2026-02-27 21:30 - US-013
+- Refactored AI mode landing page at / to create game via REST API and redirect to /game/[id]
+- Files changed:
+  - `apps/tictactoe/src/app/page.tsx` - Replaced local game state management with createGame('ai') API call + router.push() redirect; kept GameHistorySidebar visible during loading
+- **Learnings for future iterations:**
+  - Used `useRef` (creatingRef) to prevent double-creation in React StrictMode (useEffect fires twice in dev)
+  - The page is now much simpler: ~60 lines vs ~175 lines — just create game, store token, redirect
+  - Game history sidebar still uses the existing `useGameHistory` GraphQL hook — will be migrated to REST in US-023
+  - localStorage key format `playerToken-{gameId}` matches what /game/[id] page reads
+  - Error state includes a "Try Again" button that reloads the page to re-trigger game creation
+---
+
+## 2026-02-27 22:00 - US-014
+- Created PvP Player X page at /x that creates a PvP game and shows a shareable link for Player O
+- Files changed:
+  - `apps/tictactoe/src/app/x/page.tsx` - New 'use client' page: creates PvP game via createGame('pvp'), stores playerToken in localStorage, displays shareable /o?game={id} link with copy-to-clipboard, "Go to Game" button navigates to /game/{id}
+- **Learnings for future iterations:**
+  - Same `useRef` (creatingRef) pattern as page.tsx to prevent double-creation in React StrictMode
+  - `navigator.clipboard.writeText()` is used for copy-to-clipboard — show "Copied!" briefly with setTimeout (2 seconds)
+  - Share link uses `window.location.origin` for dynamic origin — wrapped in ternary for SSR safety (typeof window check)
+  - Prettier requires breaking long template literals across multiple lines when they contain ternary expressions
+  - The page has 3 states: loading (creating game), share link view (game created, showing link + "Go to Game"), and error state
+---
+
+## 2026-02-27 22:30 - US-015
+- Created PvP Player O page at /o that joins an existing PvP game via invite link
+- Files changed:
+  - `apps/tictactoe/src/app/o/page.tsx` - New 'use client' page: reads `game` query param via useSearchParams(), calls joinGame(), stores playerToken in localStorage, redirects to /game/{id}. Wrapped in Suspense boundary.
+- **Learnings for future iterations:**
+  - `useSearchParams()` requires a Suspense boundary in Next.js 14 app router — wrap content component in Suspense with a fallback
+  - To avoid ESLint `no-non-null-assertion` warning, capture nullable value in a local const after the null check (e.g., `const id = gameId;`) and use that in the async function instead of `gameId!`
+  - Prettier collapses single-line strings — don't wrap short string arguments across multiple lines with `setError(\n...\n)`, keep them on one line
+  - Same `useRef` (joiningRef) pattern as page.tsx and /x to prevent double API calls in React StrictMode
+  - Error handling parses API error messages for status codes (409=already joined, 404=not found, 400=not PvP) to show user-friendly messages
+---
+
+## 2026-02-27 23:00 - US-016
+- Removed frontend AI pipeline and old game logic, cleaned up dependencies
+- Files changed:
+  - `apps/tictactoe/src/app/api/ai-move/route.ts` - Deleted (Next.js AI route handler, no longer needed)
+  - `apps/tictactoe/src/lib/ai/` - Deleted entire directory (6 files: graphState.ts, llm.ts, moveGraph.ts, movePrompt.ts, moveValidator.ts, nodes.ts)
+  - `apps/tictactoe/src/lib/game/gameLogic.ts` - Deleted (pure game logic, now lives in backend at apps/tictactoe-api/src/lib/game/gameLogic.ts)
+  - `apps/tictactoe/package.json` - Removed @langchain/aws, @langchain/core, @langchain/langgraph, zod; added socket.io-client
+  - `pnpm-lock.yaml` - Updated after dependency changes
+- **Learnings for future iterations:**
+  - No surviving files imported from `@/lib/ai/` or `@/lib/game/gameLogic` — all references were contained within the deleted files themselves
+  - The `@/types/game` types file is NOT deleted — it's still used by components (Cell, GameBoard, GameStatus, GameHistoryItem), API client (gameApi.ts), and GraphQL transforms
+  - Empty directories (app/api/, lib/game/) were cleaned up after file deletion
+  - Frontend build size decreased significantly after removing heavy langchain dependencies
+  - socket.io-client added now for US-020 (frontend WebSocket hook) — best to add it when removing deps to keep the package.json change atomic
+---
+
+## 2026-02-27 23:30 - US-017
+- Updated GameStatus component to support AI and PvP mode-specific messages
+- Files changed:
+  - `apps/tictactoe/src/components/GameStatus.tsx` - Added mode, playerSide, and currentTurn props to interface; created separate aiMessages and pvpMessages Records; branches on mode to select message set
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Passes mode and currentTurn from game state to GameStatus component
+- **Learnings for future iterations:**
+  - GameStatus props: mode (default 'ai'), playerSide (optional, for future personalization), currentTurn (default 'X') — backward compatible since all new props have defaults
+  - PvP in_progress uses `currentTurn` for "X's turn" / "O's turn" messages; `playerSide` is in the interface for future "Your turn" personalization but not actively used yet
+  - AI mode messages unchanged: 'Your turn (X)', 'You win!', 'AI wins!', 'It is a draw!'
+  - PvP mode messages: "{currentTurn}'s turn", 'X wins!', 'O wins!', 'It is a draw!'
+  - The `playerSide` prop is accepted but not destructured to avoid ESLint unused variable warnings — consumers can pass it and it will be available when needed
+---
+
+## 2026-02-27 24:00 - US-018
+- Added Redis service to Docker infrastructure for Socket.IO adapter (used in US-019)
+- Files changed:
+  - `apps/tictactoe-api/docker-compose.yml` - Added redis service: redis:7-alpine, container tictactoe-redis, port 6379:6379, restart unless-stopped
+  - `apps/tictactoe-api/.env.local` - Added REDIS_HOST=localhost and REDIS_PORT=6379
+  - `apps/tictactoe-api/.env.example` - Added REDIS_HOST=localhost and REDIS_PORT=6379
+- **Learnings for future iterations:**
+  - Redis alpine image is ~30MB — pulls quickly
+  - No application code changes needed for this story — purely infrastructure
+  - Redis accessible at localhost:6379, verified via `docker exec tictactoe-redis redis-cli ping` → PONG
+  - docker-compose up -d starts both PostgreSQL and Redis containers successfully
+---
+
+## 2026-02-27 - US-019
+- Implemented WebSocket gateway for PvP real-time updates
+- Files changed:
+  - `apps/tictactoe-api/package.json` - Added @nestjs/websockets, @nestjs/platform-socket.io (v10), socket.io, @socket.io/redis-adapter, ioredis
+  - `apps/tictactoe-api/src/modules/game/game.gateway.ts` - New file: WebSocket gateway with /game namespace, Redis adapter, joinGame handler, broadcastGameUpdate method
+  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added GameGateway to providers array
+  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected GameGateway, calls broadcastGameUpdate() after successful PvP moves
+  - `pnpm-lock.yaml` - Updated with new WebSocket dependencies
+- **Learnings for future iterations:**
+  - @nestjs/websockets and @nestjs/platform-socket.io versions MUST match @nestjs/core version — v11 requires @nestjs/common v11. Since we use NestJS 10, must install v10.x specifically
+  - OnGatewayInit.afterInit(server) is the correct lifecycle hook for configuring the Redis adapter — the server instance is passed as parameter
+  - ioredis `pubClient.duplicate()` creates a matching sub client for the Redis adapter — avoids creating two separate Redis instances
+  - GameGateway broadcast is placed AFTER queryRunner.commitTransaction() to ensure the DB state is committed before clients receive the update
+  - The broadcast only fires for PvP mode moves (`game.mode === 'pvp'`) — AI mode doesn't need WebSocket updates
+  - Socket.IO rooms use `game-{gameId}` naming convention; clients emit `joinGame` with `{ gameId }` to join
+---
+
+## 2026-02-27 - US-020
+- Created frontend WebSocket hook for PvP real-time updates and integrated it into the game page
+- Files changed:
+  - `apps/tictactoe/src/lib/api/useGameSocket.ts` - New React hook: connects to Socket.IO /game namespace in PvP mode, emits joinGame on connect, listens for gameUpdate events, cleans up on unmount
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Added useGameSocket call: passes gameId (null until game loaded), game mode, and setGame callback for real-time updates
+- **Learnings for future iterations:**
+  - Use `useRef` for the onUpdate callback to avoid socket reconnections when the callback identity changes (common React pattern for event handlers in effects)
+  - The hook passes `game ? gameId : null` as first arg to delay socket connection until the game is loaded and mode is known — avoids connecting with wrong mode
+  - `game?.mode ?? 'ai'` defaults to 'ai' before game loads, so the hook does nothing (no-op for AI mode) — safe default
+  - socket.io-client was already added to package.json in US-016 — no additional dependency install needed
+  - The hook is intentionally simple: no reconnection logic or error handling beyond socket.io-client defaults — socket.io handles reconnection automatically
+---
+
+## 2026-02-27 - US-021
+- Implemented PostGraphile read-only security via PostgreSQL roles
+- Files changed:
+  - `apps/tictactoe-api/src/migrations/1772320000000-CreatePostgraphileReadOnlyRole.ts` - New migration: creates postgraphile_user role with LOGIN, grants SELECT on game table, revokes INSERT/UPDATE/DELETE
+  - `apps/tictactoe-api/src/config/graphile.ts` - Updated PostGraphile config to use POSTGRAPHILE_USER/POSTGRAPHILE_PASSWORD env vars instead of the main postgres superuser
+  - `apps/tictactoe-api/.env.local` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
+  - `apps/tictactoe-api/.env.example` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
+  - `scripts/ralph/prd.json` - Marked US-021 as passes: true
+- **Learnings for future iterations:**
+  - Use `DO $$ BEGIN IF NOT EXISTS ... END $$` pattern for idempotent role creation — avoids errors if migration is re-run
+  - Two separate DB connections coexist: TypeORM uses postgres superuser (full read/write for GameService), PostGraphile uses postgraphile_user (SELECT only)
+  - `GRANT CONNECT ON DATABASE` and `GRANT USAGE ON SCHEMA public` are needed in addition to table-level GRANT SELECT — without these the role can't even access the schema
+  - Verified with psql: SELECT works, INSERT/UPDATE/DELETE all return "permission denied for table game"
+  - The PostGraphile config in graphile.ts overrides only `user` and `password` fields — host, port, and database are shared from the common postgres config
+---
+
+## 2026-02-27 - US-022
+- Added mode toggle UI component for switching between AI and PvP modes
+- Files changed:
+  - `apps/tictactoe/src/components/ModeToggle.tsx` - New component: two buttons ("Play vs AI" / "Play vs Human") using Button component with default/outline variants to indicate current mode
+  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Imported ModeToggle, placed between title and GameStatus; onSelectMode navigates to `/` (AI) or `/x` (PvP)
+- **Learnings for future iterations:**
+  - The existing Button component with `variant` prop (default vs outline) provides a clean toggle pattern — no need for a dedicated toggle/tab component
+  - ModeToggle accepts `currentMode` and `onSelectMode` — current mode is highlighted with `default` variant, other mode uses `outline`
+  - Navigation to `/` creates a new AI game, navigation to `/x` creates a new PvP game — the existing page.tsx and /x/page.tsx handle creation on mount
+  - Component placed between the h1 title and GameStatus for visual prominence without cluttering the board area
+---
+
+## 2026-02-27 - US-023
+- Added mode labels to game history sidebar and migrated history fetching from GraphQL to REST API
+- Files changed:
+  - `apps/tictactoe/src/types/game.ts` - Added GameMode type ('ai' | 'pvp') and mode field to GameSummary interface
+  - `apps/tictactoe/src/components/GameHistoryItem.tsx` - Added mode badge (AI with secondary variant, PvP with outline variant) next to result badge; in_progress games no longer show a result badge
+  - `apps/tictactoe/src/lib/graphql/hooks.ts` - Replaced GraphQL apolloClient.query with REST listGames() from gameApi; maps GameStateDto to GameSummary with mode field
+  - `apps/tictactoe/src/lib/graphql/transforms.ts` - Added mode field to GraphQLGameNode type and transformGameToSummary output (for type compatibility)
+  - `scripts/ralph/prd.json` - Marked US-023 as passes: true
+- **Learnings for future iterations:**
+  - When adding a required field to a shared type like GameSummary, ALL consumers must be updated — including transform functions that may not be actively used anymore
+  - The useGameHistory hook still lives in lib/graphql/hooks.ts despite now using REST — a future cleanup could move it to lib/api/ or rename the directory
+  - Badge component supports 4 variants: default, secondary, destructive, outline — secondary (muted bg) for AI and outline (border only) for PvP provides good visual distinction
+  - getResultBadge returns null for in_progress games (no result badge) — previously it always returned a Draw badge as default
+---
