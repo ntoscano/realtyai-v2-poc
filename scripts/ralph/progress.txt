@@ -17,6 +17,8 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - Controllers use `@Controller('api')` prefix; DTO files go in `dto/` subdirectory under each module
 - Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
 - Left join related entities (booking + professional) in shift queries to include nested data
+- For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
+- Booking controller uses `@Controller('api/shifts')` — sub-resources use the parent resource path prefix
 ---
 
 ## 2026-03-01 - US-001
@@ -71,4 +73,21 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Left join booking + professional in shift queries so response includes booking info when shift is booked
   - Service validates business rules (facility exists, endTime > startTime) and throws NestJS exceptions (NotFoundException, BadRequestException)
   - The prettier/prettier eslint rule fails on decorator files due to root @trivago/prettier-plugin-sort-imports — this is pre-existing and not a blocker (same in tictactoe-api)
+---
+
+## 2026-03-01 - US-004
+- Implemented booking endpoint with pessimistic locking for concurrent safety
+- Files created:
+  - src/modules/booking/dto/book-shift.dto.ts (class-validator: IsUUID for professionalId)
+  - src/modules/booking/booking.service.ts (bookShift with QueryRunner, pessimistic_write lock, transaction)
+  - src/modules/booking/booking.controller.ts (@Controller('api/shifts') with POST :id/book)
+- Files modified:
+  - src/modules/booking/booking.module.ts (wired TypeOrmModule.forFeature([Booking, Shift, Professional]), controller, service)
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Use `DataSource.createQueryRunner()` for transactions — inject `DataSource` directly (not repositories) for QueryRunner pattern
+  - Pessimistic lock: `createQueryBuilder('entity').setLock('pessimistic_write').where(...).getOne()`
+  - Use `queryRunner.manager.getRepository(Entity)` inside transactions to ensure operations run within the transaction
+  - Booking controller uses `@Controller('api/shifts')` (not `@Controller('api')`) since all routes are under /api/shifts/:id/book
+  - Error codes: 404 (not found), 409 (already booked), 400 (qualification mismatch) — match PRD exactly
 ---
