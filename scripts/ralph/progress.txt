@@ -8,7 +8,12 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
 - `synchronize: true` for POC apps (no migrations needed)
 - Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
-- Empty entities array in config/entities.ts — add entities as they're created
+- Entity files live in `entities/` subdirectory under each module
+- `@Index` for composite indexes goes at class level above `@Entity`
+- Cross-module entity imports use relative paths (e.g., `../../shift/entities/shift.entity`)
+- New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
+- New NestJS apps MUST have `.eslintrc.js` copied from tictactoe-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
+- Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
 ---
 
 ## 2026-03-01 - US-001
@@ -28,4 +33,22 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Used synchronize: true (not false like tictactoe-api) since PRD says "TypeORM synchronize: true auto-creates tables on startup"
   - .env.local is already in root .gitignore so it's safe to create per-app
   - @nestjs/schematics peer dep warning for typescript 5.9 is expected (warns for ^3.4.5 || ^4.3.5) — doesn't affect builds
+---
+
+## 2026-03-01 - US-002
+- Created 4 TypeORM entities: Facility, Professional, Shift, Booking
+- Files created:
+  - src/modules/shift/entities/facility.entity.ts (OneToMany to Shift)
+  - src/modules/shift/entities/professional.entity.ts
+  - src/modules/shift/entities/shift.entity.ts (ManyToOne Facility, OneToOne Booking, composite indexes)
+  - src/modules/booking/entities/booking.entity.ts (OneToOne Shift, ManyToOne Professional, index on [professionalId, status])
+- Updated src/config/entities.ts to export [Facility, Professional, Shift, Booking]
+- Type aliases exported: FacilityType, Qualification, ShiftStatus, BookingStatus
+- Typecheck passes
+- **Learnings for future iterations:**
+  - Entity files go in `entities/` subdirectory under each module (e.g., `modules/shift/entities/`)
+  - `@Index` decorator for composite indexes goes at the class level (above `@Entity`), not on individual properties
+  - Cross-module entity imports use relative paths (e.g., booking.entity imports from `../../shift/entities/shift.entity`)
+  - `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy to ensure correct FK column naming
+  - `bookedAt` uses `default: () => 'NOW()'` (function form) for DB-level default
 ---

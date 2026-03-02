@@ -38,7 +38,7 @@
 				"Typecheck passes"
 			],
 			"priority": 2,
-			"passes": false,
+			"passes": true,
 			"notes": "Use SnakeNamingStrategy (camelCase in TS -> snake_case in DB). Export type aliases: FacilityType = 'nursing_home' | 'hospital' | 'clinic', Qualification = 'CNA' | 'LPN' | 'RN', ShiftStatus = 'open' | 'booked' | 'completed' | 'cancelled', BookingStatus = 'confirmed' | 'completed' | 'cancelled'. See docs/clipboard-health-implementation-plan.md for exact entity definitions."
 		},
 		{
