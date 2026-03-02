@@ -19,6 +19,9 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - Left join related entities (booking + professional) in shift queries to include nested data
 - For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
 - Booking controller uses `@Controller('api/shifts')` — sub-resources use the parent resource path prefix
+- NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
+- PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking rows with related entities
+- Booking endpoint should return HTTP 200 (not 201) — use `@HttpCode(200)` on the controller method
 ---
 
 ## 2026-03-01 - US-001
@@ -107,4 +110,31 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - TypeORM `upsert()` requires a unique constraint on the conflict column — added `unique: true` to entity `@Column` decorator
   - CLI scripts create their own DataSource (not NestJS bootstrap) — load dotenv manually at top of file
   - The `upsert(data, ['conflictColumn'])` second param is the column(s) to detect conflicts on
+---
+
+## 2026-03-01 - US-006
+- Verified full backend end-to-end via curl tests, found and fixed 3 issues
+- Issues fixed:
+  1. Missing `tsconfig.build.json` — `nest start --watch` requires it (not just tsconfig.json)
+  2. `leftJoinAndSelect` in booking service caused "FOR UPDATE cannot be applied to nullable side of outer join" — changed to `innerJoinAndSelect`
+  3. Booking endpoint returned 201 instead of 200 — added `@HttpCode(200)` decorator
+- Files created:
+  - tsconfig.build.json (extends tsconfig.json, excludes test/spec files)
+- Files modified:
+  - src/modules/booking/booking.service.ts (leftJoinAndSelect → innerJoinAndSelect for pessimistic lock query)
+  - src/modules/booking/booking.controller.ts (added @HttpCode(200) import and decorator)
+- All curl tests verified:
+  - GET /api/facilities → 3 facilities with UUIDs
+  - GET /api/professionals → 5 professionals with UUIDs
+  - POST /api/shifts → 201 with facility name
+  - GET /api/shifts → returns created shifts with facility and booking data
+  - POST /api/shifts/:id/book → 200 with booking and professional details
+  - Duplicate booking → 409 "Shift is already booked"
+  - Qualification mismatch → 400 with descriptive message
+  - Invalid POST → 400 with validation error array
+- Typecheck passes
+- **Learnings for future iterations:**
+  - Always include `tsconfig.build.json` when scaffolding NestJS apps — it's required by `nest start --watch` and `nest build`
+  - When using `setLock('pessimistic_write')` with TypeORM, never use `leftJoinAndSelect` — PostgreSQL FOR UPDATE does not support nullable outer joins. Use `innerJoinAndSelect` for required relations.
+  - NestJS defaults POST to 201 — use `@HttpCode(200)` when the endpoint updates rather than creates
 ---

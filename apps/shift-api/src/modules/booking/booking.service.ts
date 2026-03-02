@@ -21,11 +21,12 @@ export class BookingService {
 
     try {
       // Lock the shift row with pessimistic_write
+      // Use innerJoin (not leftJoin) because FOR UPDATE cannot be applied to nullable outer joins
       const shift = await queryRunner.manager
         .getRepository(Shift)
         .createQueryBuilder('shift')
         .setLock('pessimistic_write')
-        .leftJoinAndSelect('shift.facility', 'facility')
+        .innerJoinAndSelect('shift.facility', 'facility')
         .where('shift.id = :id', { id: shiftId })
         .getOne();
 

@@ -113,7 +113,7 @@
 				"Invalid POST requests return 400 with descriptive validation errors"
 			],
 			"priority": 6,
-			"passes": false,
+			"passes": true,
 			"notes": "This is a verification story — fix any issues found during testing. Run docker:up, dev, and seed before curl tests. Use actual UUIDs from seed response in subsequent curl commands."
 		},
 		{
