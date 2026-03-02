@@ -4,6 +4,7 @@ storybook-static
 apps/realty-ai-api
 apps/tictactoe-api
 apps/shift-api
+apps/shift-ui
 
 # debug
 npm-debug.log*

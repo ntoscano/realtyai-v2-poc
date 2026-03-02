@@ -22,6 +22,11 @@ Started: Sun Mar  1 18:47:22 PST 2026
 - NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
 - PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking rows with related entities
 - Booking endpoint should return HTTP 200 (not 201) — use `@HttpCode(200)` on the controller method
+- New Next.js apps MUST also be added to root `.prettierignore` (same as NestJS apps)
+- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui
+- Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
+- shadcn/ui components go in `src/components/ui/` — copy badge, button, card from tictactoe as baseline
+- No select.tsx in tictactoe — use native HTML select or create one for shift-ui dashboards
 ---
 
 ## 2026-03-01 - US-001
@@ -137,4 +142,29 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Always include `tsconfig.build.json` when scaffolding NestJS apps — it's required by `nest start --watch` and `nest build`
   - When using `setLock('pessimistic_write')` with TypeORM, never use `leftJoinAndSelect` — PostgreSQL FOR UPDATE does not support nullable outer joins. Use `innerJoinAndSelect` for required relations.
   - NestJS defaults POST to 201 — use `@HttpCode(200)` when the endpoint updates rather than creates
+---
+
+## 2026-03-01 - US-007
+- Scaffolded apps/shift-ui/ with Next.js 14, Tailwind, shadcn/ui, types, and API client
+- Files created:
+  - package.json (no Apollo, GraphQL, Socket.io deps; dev server on port 2026)
+  - tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts
+  - .env.example, .env.local (NEXT_PUBLIC_API_URL=http://localhost:3003)
+  - src/app/globals.css (Tailwind base + shadcn theme variables)
+  - src/lib/utils.ts (cn() utility)
+  - src/components/ui/badge.tsx, button.tsx, card.tsx (copied from tictactoe)
+  - src/types/shift.ts (FacilityType, Qualification, ShiftStatus, Facility, Professional, BookingInfo, Shift interfaces)
+  - src/lib/api/shiftApi.ts (apiFetch wrapper + listFacilities, listProfessionals, createShift, listShifts, getShift, bookShift)
+  - src/app/layout.tsx (nav bar with links to /facility and /professional)
+  - src/app/page.tsx (landing page with links to both dashboards)
+  - src/app/facility/page.tsx (placeholder for US-008)
+  - src/app/professional/page.tsx (placeholder for US-009)
+- Files modified:
+  - .prettierignore (added apps/shift-ui to avoid root @trivago/prettier-plugin-sort-imports issues)
+- pnpm install succeeded, typecheck passes, `next dev` starts on port 2026
+- **Learnings for future iterations:**
+  - Next.js apps also need to be in root `.prettierignore` to avoid root prettier plugin conflicts
+  - No select.tsx component exists in tictactoe — will need native HTML selects or a custom component for the dashboard dropdowns
+  - The API error handling pattern extracts `body.message` from JSON responses and attaches `status` code as a property on the Error object — useful for distinguishing 400/409/404 errors in the UI
+  - Placeholder pages for /facility and /professional routes ensure Next.js routing works immediately
 ---
