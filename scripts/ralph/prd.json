@@ -92,7 +92,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": false,
+			"passes": true,
 			"notes": "Use TypeORM DataSource directly (not NestJS app bootstrap) for the CLI script. Upsert by name to be idempotent. The seed script should create its own DataSource connection, run the seed, then close the connection."
 		},
 		{

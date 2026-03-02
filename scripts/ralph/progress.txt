@@ -90,4 +90,21 @@ Started: Sun Mar  1 18:47:22 PST 2026
   - Use `queryRunner.manager.getRepository(Entity)` inside transactions to ensure operations run within the transaction
   - Booking controller uses `@Controller('api/shifts')` (not `@Controller('api')`) since all routes are under /api/shifts/:id/book
   - Error codes: 404 (not found), 409 (already booked), 400 (qualification mismatch) — match PRD exactly
+- Seed scripts: use TypeORM `upsert()` with unique `name` column for idempotent seeding (requires unique constraint on entity)
+- CLI scripts load .env.local via `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` at top of file
+---
+
+## 2026-03-01 - US-005
+- Created seed script for 3 facilities and 5 professionals with upsert pattern
+- Files created:
+  - src/cli/seed.ts (TypeORM DataSource directly, upsert by name for idempotency)
+- Files modified:
+  - src/modules/shift/entities/facility.entity.ts (added unique: true to name column for upsert)
+  - src/modules/shift/entities/professional.entity.ts (added unique: true to name column for upsert)
+- Seed script already wired in package.json from US-001: `"seed": "ts-node --project tsconfig.json src/cli/seed.ts"`
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - TypeORM `upsert()` requires a unique constraint on the conflict column — added `unique: true` to entity `@Column` decorator
+  - CLI scripts create their own DataSource (not NestJS bootstrap) — load dotenv manually at top of file
+  - The `upsert(data, ['conflictColumn'])` second param is the column(s) to detect conflicts on
 ---
