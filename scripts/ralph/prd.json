@@ -21,7 +21,7 @@
 				"Typecheck passes"
 			],
 			"priority": 1,
-			"passes": false,
+			"passes": true,
 			"notes": "Reference apps/tictactoe-api/ for all patterns. Port 54323 for Postgres (54321 = realty-ai, 54322 = tictactoe). Create placeholder ShiftModule and BookingModule (empty modules) so app.module.ts compiles."
 		},
 		{

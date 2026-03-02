@@ -1,3 +1,31 @@
 # Ralph Progress Log
 Started: Sun Mar  1 18:47:22 PST 2026
+
+## Codebase Patterns
+- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace
+- NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
+- TypeORM config uses `getConfig()` from postgres.ts for connection params
+- SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
+- `synchronize: true` for POC apps (no migrations needed)
+- Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
+- Empty entities array in config/entities.ts — add entities as they're created
+---
+
+## 2026-03-01 - US-001
+- Scaffolded apps/shift-api/ with NestJS 10, TypeORM, PostgreSQL config
+- Files created:
+  - package.json (no langchain, redis, socket.io, postgraphile deps)
+  - tsconfig.json, nest-cli.json (identical to tictactoe-api)
+  - docker-compose.yml (postgres:16 on port 54323, db shift_marketplace)
+  - .env.example, .env.local
+  - src/config/postgres.ts, typeorm.ts, entities.ts
+  - src/main.ts (port 3003, CORS, global ValidationPipe)
+  - src/app.module.ts (TypeORM.forRoot, ShiftModule, BookingModule)
+  - src/modules/shift/shift.module.ts (placeholder)
+  - src/modules/booking/booking.module.ts (placeholder)
+- pnpm install succeeded, typecheck passes
+- **Learnings for future iterations:**
+  - Used synchronize: true (not false like tictactoe-api) since PRD says "TypeORM synchronize: true auto-creates tables on startup"
+  - .env.local is already in root .gitignore so it's safe to create per-app
+  - @nestjs/schematics peer dep warning for typescript 5.9 is expected (warns for ^3.4.5 || ^4.3.5) — doesn't affect builds
 ---

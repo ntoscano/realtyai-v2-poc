@@ -3,6 +3,7 @@ dist
 storybook-static
 apps/realty-ai-api
 apps/tictactoe-api
+apps/shift-api
 
 # debug
 npm-debug.log*
