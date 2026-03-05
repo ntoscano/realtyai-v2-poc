@@ -3,7 +3,7 @@ Started: Wed Mar  4 16:37:23 PST 2026
 
 ## Codebase Patterns
 - Port assignments: 54321=realty-ai, 54322=tictactoe, 54323=shift-marketplace, 54324=midi-matching
-- App ports: 3003=shift-api, 3004=midi-api
+- App ports: 3003=shift-api, 3004=midi-api, UI ports: 2026=shift-ui, 2027=midi-ui
 - Always add NestJS apps to root .prettierignore (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
 - NestJS apps need a local .prettierrc.js (without the sort-imports plugin) so eslint's prettier/recommended can parse decorators
 - Symptom-to-specialty mapping is in src/shared/symptom-specialty-map.ts — reuse in both QuestionnaireService and ClinicianService
@@ -128,4 +128,18 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - TypeORM .save() uses loaded relation objects to infer FK values — null both the FK field AND the relation property
   - Use leftJoinAndSelect instead of innerJoinAndSelect for nullable FK relations in list queries
   - Clean dist/ when restarting nest start --watch after entity changes — old compiled JS may persist
+---
+
+## 2026-03-04 - US-009
+- Scaffolded apps/midi-ui/ with Next.js 14, React 18, Tailwind CSS, shadcn/ui components
+- Files created: package.json, tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts, .env.example, .env.local, src/app/globals.css, src/lib/utils.ts, src/components/ui/button.tsx, src/components/ui/card.tsx, src/components/ui/badge.tsx, src/types/index.ts, src/lib/api/midiApi.ts, src/app/layout.tsx, src/app/page.tsx, src/app/questionnaire/page.tsx, src/app/clinician/page.tsx
+- Updated root .prettierignore to include apps/midi-ui
+- Types cover all domain entities: Patient, Clinician, Specialty, ClinicianSpecialty, StateLicense, AvailabilitySlot, Appointment, HealthQuestionnaire, MatchedClinician, plus type literals for Symptom, CareGoal, Severity, MenopauseStage, VisitType, AppointmentStatus, ClinicianCredential, CancelledBy
+- API client (midiApi.ts) wraps all backend endpoints: listPatients, submitQuestionnaire, matchClinicians, getClinicianDetail, getClinicianSlots, bookAppointment, listAppointments, cancelAppointment, listClinicians
+- **Learnings for future iterations:**
+  - shift-ui patterns work well as template — same package.json deps, tsconfig, tailwind config, shadcn components
+  - pnpm-workspace.yaml already includes apps/* glob so new apps are auto-discovered
+  - Frontend types should mirror backend entity shapes but use string for Date/timestamp fields (JSON serialization)
+  - QuestionnaireResponse extends HealthQuestionnaire with matchedSpecialties (computed, not stored)
+  - ApiError interface pattern: extend Error with status field, cast in apiFetch catch block
 ---

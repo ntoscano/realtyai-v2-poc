@@ -187,7 +187,7 @@
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": false,
+			"passes": true,
 			"notes": "Reference apps/shift-ui/ for all frontend patterns. API client pattern from shift-ui/src/lib/api/shiftApi.ts. NEXT_PUBLIC_API_URL defaults to http://localhost:3004. Use native HTML selects (no shadcn Select component). Add to root .prettierignore."
 		},
 		{
