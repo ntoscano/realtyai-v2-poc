@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, DeepPartial } from 'typeorm';
-import { Appointment, VisitType } from './entities/appointment.entity';
+import {
+	Appointment,
+	VisitType,
+	AppointmentStatus,
+	CancelledBy,
+} from './entities/appointment.entity';
 import { AvailabilitySlot } from './entities/availability-slot.entity';
 import { Patient } from '../patient/entities/patient.entity';
 import { Clinician } from '../clinician/entities/clinician.entity';
 import { StateLicense } from '../clinician/entities/state-license.entity';
 import { BookAppointmentDto } from './dto/book-appointment.dto';
+import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 export interface BookAppointmentResult {
 	id: string;
@@ -22,6 +28,19 @@ export interface BookAppointmentResult {
 	endTime: Date;
 	status: string;
 	visitType: string;
+}
+
+export interface AppointmentListItem {
+	id: string;
+	patientId: string;
+	patientName: string;
+	clinicianId: string;
+	clinicianName: string;
+	startTime: Date;
+	endTime: Date;
+	status: string;
+	visitType: string;
+	createdAt: Date;
 }
 
 @Injectable()
@@ -134,6 +153,120 @@ export class AppointmentService {
 				endTime: slot.endTime,
 				status: appointment.status,
 				visitType: appointment.visitType,
+			};
+		} catch (error) {
+			await queryRunner.rollbackTransaction();
+			throw error;
+		} finally {
+			await queryRunner.release();
+		}
+	}
+
+	async listForPatient(patientId: string): Promise<AppointmentListItem[]> {
+		const appointments = await this.appointmentRepository
+			.createQueryBuilder('appt')
+			.innerJoinAndSelect('appt.clinician', 'clinician')
+			.innerJoinAndSelect('appt.patient', 'patient')
+			.innerJoinAndSelect('appt.slot', 'slot')
+			.where('appt.patientId = :patientId', { patientId })
+			.orderBy('slot.startTime', 'DESC')
+			.getMany();
+
+		return appointments.map((appt) => ({
+			id: appt.id,
+			patientId: appt.patientId,
+			patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
+			clinicianId: appt.clinicianId,
+			clinicianName: `${appt.clinician.firstName} ${appt.clinician.lastName}, ${appt.clinician.credential}`,
+			startTime: appt.slot.startTime,
+			endTime: appt.slot.endTime,
+			status: appt.status,
+			visitType: appt.visitType,
+			createdAt: appt.createdAt,
+		}));
+	}
+
+	async listForClinician(clinicianId: string): Promise<AppointmentListItem[]> {
+		const appointments = await this.appointmentRepository
+			.createQueryBuilder('appt')
+			.innerJoinAndSelect('appt.clinician', 'clinician')
+			.innerJoinAndSelect('appt.patient', 'patient')
+			.innerJoinAndSelect('appt.slot', 'slot')
+			.where('appt.clinicianId = :clinicianId', { clinicianId })
+			.orderBy('slot.startTime', 'DESC')
+			.getMany();
+
+		return appointments.map((appt) => ({
+			id: appt.id,
+			patientId: appt.patientId,
+			patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
+			clinicianId: appt.clinicianId,
+			clinicianName: `${appt.clinician.firstName} ${appt.clinician.lastName}, ${appt.clinician.credential}`,
+			startTime: appt.slot.startTime,
+			endTime: appt.slot.endTime,
+			status: appt.status,
+			visitType: appt.visitType,
+			createdAt: appt.createdAt,
+		}));
+	}
+
+	async updateStatus(
+		id: string,
+		dto: UpdateAppointmentDto,
+	): Promise<AppointmentListItem> {
+		const queryRunner = this.dataSource.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
+
+		try {
+			const appointment = await queryRunner.manager
+				.createQueryBuilder(Appointment, 'appt')
+				.innerJoinAndSelect('appt.clinician', 'clinician')
+				.innerJoinAndSelect('appt.patient', 'patient')
+				.innerJoinAndSelect('appt.slot', 'slot')
+				.where('appt.id = :id', { id })
+				.getOne();
+
+			if (!appointment) {
+				throw new NotFoundException(`Appointment with ID "${id}" not found`);
+			}
+
+			// Validate status transitions
+			const currentStatus = appointment.status;
+			const newStatus = dto.status as AppointmentStatus;
+
+			if (currentStatus !== 'scheduled') {
+				throw new BadRequestException(
+					`Cannot change status from "${currentStatus}" to "${newStatus}". Only scheduled appointments can be updated.`,
+				);
+			}
+
+			appointment.status = newStatus;
+
+			if (newStatus === 'cancelled') {
+				appointment.cancelledAt = new Date();
+				appointment.cancelledBy = dto.cancelledBy as CancelledBy;
+
+				// Free the slot for rebooking
+				const slot = appointment.slot;
+				slot.isBooked = false;
+				await queryRunner.manager.save(AvailabilitySlot, slot);
+			}
+
+			await queryRunner.manager.save(Appointment, appointment);
+			await queryRunner.commitTransaction();
+
+			return {
+				id: appointment.id,
+				patientId: appointment.patientId,
+				patientName: `${appointment.patient.firstName} ${appointment.patient.lastName}`,
+				clinicianId: appointment.clinicianId,
+				clinicianName: `${appointment.clinician.firstName} ${appointment.clinician.lastName}, ${appointment.clinician.credential}`,
+				startTime: appointment.slot.startTime,
+				endTime: appointment.slot.endTime,
+				status: appointment.status,
+				visitType: appointment.visitType,
+				createdAt: appointment.createdAt,
 			};
 		} catch (error) {
 			await queryRunner.rollbackTransaction();

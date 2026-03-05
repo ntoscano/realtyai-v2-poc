@@ -119,7 +119,7 @@
 				"Typecheck passes"
 			],
 			"priority": 6,
-			"passes": false,
+			"passes": true,
 			"notes": "The cancel flow must update both the appointment status AND the slot isBooked flag in a transaction. Use the same QueryRunner pattern. Status transitions: scheduled→cancelled, scheduled→completed, scheduled→no_show. Invalid transitions return 400. Also add GET /api/clinicians (all active clinicians, no filtering) to clinician.controller.ts so the clinician dashboard can populate a dropdown."
 		},
 		{

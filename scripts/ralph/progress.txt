@@ -76,3 +76,16 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Cast DTO string fields to entity union types (e.g., `dto.visitType as VisitType`) before passing to create() — TS won't narrow string to union automatically
   - Licensure check within transaction ensures consistency — queries state_license for verified, non-expired license in patient's state
 ---
+
+## 2026-03-04 - US-006
+- Implemented appointment listing and status management endpoints
+- Files created: src/modules/appointment/dto/update-appointment.dto.ts
+- Files modified: src/modules/appointment/appointment.service.ts (added listForPatient, listForClinician, updateStatus), src/modules/appointment/appointment.controller.ts (added GET and PATCH endpoints)
+- Endpoints: GET /api/appointments?patient_id=X or clinician_id=X, PATCH /api/appointments/:id
+- Cancel flow uses QueryRunner transaction: updates appointment status + cancelledAt/cancelledBy, and frees the slot (isBooked=false) for rebooking
+- Status transitions: only 'scheduled' appointments can be updated (→cancelled, →completed, →no_show). Invalid transitions return 400.
+- **Learnings for future iterations:**
+  - Use ValidateIf decorator for conditional validation — e.g., cancelledBy is required only when status is 'cancelled'
+  - Consolidate duplicate TypeORM entity imports into a single import statement — eslint --fix may split them but then you get duplicate imports
+  - GET /api/clinicians (all active clinicians) was already added in US-004 — no changes needed to clinician controller for US-006
+---
