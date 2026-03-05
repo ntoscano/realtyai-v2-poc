@@ -166,3 +166,26 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Badge variant="default" for matching specialties, variant="secondary" for non-matching — provides visual distinction
   - Link wrapping Button component works for navigation from card footers
 ---
+
+## 2026-03-04 - US-011
+- Implemented appointment booking page at src/app/book/[clinicianId]/page.tsx
+- Three-phase page: loading → slot selection → booking confirmation
+- Features implemented:
+  - Reads patient_id and questionnaire_id from URL search params (useSearchParams)
+  - Clinician info card at top: name, credential, specialties (from clinicianSpecialties), bio, rating, years experience
+  - Available time slots fetched from GET /api/clinicians/:id/slots
+  - Slots grouped by date using Map, formatted with toLocaleDateString/toLocaleTimeString
+  - Each slot rendered as an outline Button with start–end time range
+  - Clicking a slot calls POST /api/appointments with all required fields
+  - On success: shows confirmation card with clinician name, date, time, status badge, visit type
+  - On 409: shows "This time slot is no longer available" error and auto-refreshes slot list
+  - On other errors: shows error message inline
+  - Loading and error states handled throughout
+  - Back to Questionnaire link on confirmation
+- Files created: src/app/book/[clinicianId]/page.tsx
+- **Learnings for future iterations:**
+  - useParams() returns string for dynamic route segments — cast with `as string`
+  - Grouping slots by date: Map preserves insertion order, so pre-sorted slots stay sorted within groups
+  - eslint --fix resolves all prettier formatting — run it before commit to avoid lint issues
+  - ApiError type cast pattern: `const apiErr = err as ApiError; if (apiErr.status === 409)` for typed error handling
+---

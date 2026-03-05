@@ -229,7 +229,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 11,
-			"passes": false,
+			"passes": true,
 			"notes": "Use useSearchParams() to read patient_id and questionnaire_id from query params. Group slots by date using a reduce or Map. Format dates/times using Intl.DateTimeFormat or toLocaleDateString/toLocaleTimeString. After booking, show a simple confirmation card — no need for a separate page."
 		},
 		{
