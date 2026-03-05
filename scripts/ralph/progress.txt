@@ -1,348 +1,236 @@
-## Codebase Patterns
-- WebSocket gateway at `apps/tictactoe-api/src/modules/game/game.gateway.ts` — uses @nestjs/websockets v10 + @nestjs/platform-socket.io v10 (must match NestJS core version)
-- Redis adapter configured in `afterInit()` via OnGatewayInit lifecycle hook — uses ioredis pub/sub clients with `pubClient.duplicate()` for sub client
-- GameGateway is a provider in GameModule, injected into GameService for broadcasting PvP game updates
-- Use SnakeNamingStrategy: camelCase in TypeScript -> snake_case in DB columns (automatic via TypeORM config)
-- Migrations are in `apps/tictactoe-api/src/migrations/` with timestamp prefix
-- Run migrations with `pnpm typeorm:migration:run` from `apps/tictactoe-api/`
-- PostgreSQL on port 54322 (not default 5432) to avoid conflicts
-- Game entity at `apps/tictactoe-api/src/modules/game/game.entity.ts`
-- Types (CellValue, GameMove, GameStatus, GameMode) are defined in the entity file AND in `apps/tictactoe-api/src/lib/game/types.ts`
-- Pure game logic functions in `apps/tictactoe-api/src/lib/game/gameLogic.ts` — import types from `./types`
-- Typecheck: `pnpm typecheck` from `apps/tictactoe-api/`
-- Pre-commit hooks run eslint and prettier via lint-staged
-- DTOs in `apps/tictactoe-api/src/modules/game/dto/` — use class-validator for validation
-- GameService has `toGameStateDto()` private method to map entity -> DTO (does NOT expose player tokens)
-- GameController uses `@Controller('api/games')` prefix
-- Use `@UsePipes(new ValidationPipe({ whitelist: true }))` per-endpoint for input validation
-- For transactional operations with row locking: inject `DataSource`, create queryRunner, use `setLock('pessimistic_write')` for SELECT FOR UPDATE
-- Board is JSONB in DB — cast to `Board` type from `../../lib/game/types` when passing to game logic functions
-- AI module at `apps/tictactoe-api/src/modules/ai/` — AiService.generateMove(board) invokes LangGraph pipeline
-- AI files use kebab-case filenames: move-graph.ts, graph-state.ts, move-validator.ts, move-prompt.ts, llm.ts, nodes.ts
-- NestJS upgraded to v10, TypeScript upgraded to v5.9 — required for compatibility with zod v4 (transitive dep from @langchain/core)
-- AWS Bedrock env vars: AI_AWS_BEDROCK_ACCESS_KEY_ID, AI_AWS_BEDROCK_SECRET_ACCESS_KEY, AI_AWS_BEDROCK_REGION
-- Two DB connections: TypeORM uses postgres superuser (full access), PostGraphile uses postgraphile_user (SELECT only) — configured in separate config files (typeorm.ts vs graphile.ts)
-- PostGraphile credentials: POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD env vars (defaults: postgraphile_user / postgraphile)
-
 # Ralph Progress Log
-Started: Fri Feb 27 15:47:49 PST 2026
+Started: Sun Mar  1 18:47:22 PST 2026
+
+## Codebase Patterns
+- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace
+- NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
+- TypeORM config uses `getConfig()` from postgres.ts for connection params
+- SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
+- `synchronize: true` for POC apps (no migrations needed)
+- Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
+- Entity files live in `entities/` subdirectory under each module
+- `@Index` for composite indexes goes at class level above `@Entity`
+- Cross-module entity imports use relative paths (e.g., `../../shift/entities/shift.entity`)
+- New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
+- New NestJS apps MUST have `.eslintrc.js` copied from tictactoe-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
+- Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
+- Controllers use `@Controller('api')` prefix; DTO files go in `dto/` subdirectory under each module
+- Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
+- Left join related entities (booking + professional) in shift queries to include nested data
+- For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
+- Booking controller uses `@Controller('api/shifts')` — sub-resources use the parent resource path prefix
+- NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
+- PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking rows with related entities
+- Booking endpoint should return HTTP 200 (not 201) — use `@HttpCode(200)` on the controller method
+- New Next.js apps MUST also be added to root `.prettierignore` (same as NestJS apps)
+- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui
+- Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
+- shadcn/ui components go in `src/components/ui/` — copy badge, button, card from tictactoe as baseline
+- No select.tsx in tictactoe — use native HTML select styled with `border-input bg-background px-3 py-2 text-sm rounded-md` to match theme
+- Backend GET /api/shifts does not support facilityId filter — filter client-side after fetching with status=all
 ---
 
-## 2026-02-27 16:00 - US-001
-- Implemented database schema migration for game mode and turn tracking
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.entity.ts` - Added mode, currentTurn, playerXToken, playerOToken columns with types
-  - `apps/tictactoe-api/src/migrations/1772236312254-AddGameModeAndTurnTracking.ts` - New migration: truncates game data, adds 4 new columns
+## 2026-03-01 - US-001
+- Scaffolded apps/shift-api/ with NestJS 10, TypeORM, PostgreSQL config
+- Files created:
+  - package.json (no langchain, redis, socket.io, postgraphile deps)
+  - tsconfig.json, nest-cli.json (identical to tictactoe-api)
+  - docker-compose.yml (postgres:16 on port 54323, db shift_marketplace)
+  - .env.example, .env.local
+  - src/config/postgres.ts, typeorm.ts, entities.ts
+  - src/main.ts (port 3003, CORS, global ValidationPipe)
+  - src/app.module.ts (TypeORM.forRoot, ShiftModule, BookingModule)
+  - src/modules/shift/shift.module.ts (placeholder)
+  - src/modules/booking/booking.module.ts (placeholder)
+- pnpm install succeeded, typecheck passes
 - **Learnings for future iterations:**
-  - SnakeNamingStrategy handles camelCase -> snake_case automatically, but explicit `name` overrides in `@Column` decorators take precedence (e.g., `board_state`)
-  - Migration ran successfully with TRUNCATE before ALTER TABLE to avoid default value issues on existing rows
-  - Typecheck and lint pass cleanly
+  - Used synchronize: true (not false like tictactoe-api) since PRD says "TypeORM synchronize: true auto-creates tables on startup"
+  - .env.local is already in root .gitignore so it's safe to create per-app
+  - @nestjs/schematics peer dep warning for typescript 5.9 is expected (warns for ^3.4.5 || ^4.3.5) — doesn't affect builds
 ---
 
-## 2026-02-27 16:15 - US-002
-- Copied game logic and shared types to backend
-- Files changed:
-  - `apps/tictactoe-api/src/lib/game/types.ts` - Created with CellValue, Board (9-element tuple), GameMove, GameStatus, GameMode types
-  - `apps/tictactoe-api/src/lib/game/gameLogic.ts` - Copied verbatim from frontend, updated import from `@/types/game` to `./types`
+## 2026-03-01 - US-002
+- Created 4 TypeORM entities: Facility, Professional, Shift, Booking
+- Files created:
+  - src/modules/shift/entities/facility.entity.ts (OneToMany to Shift)
+  - src/modules/shift/entities/professional.entity.ts
+  - src/modules/shift/entities/shift.entity.ts (ManyToOne Facility, OneToOne Booking, composite indexes)
+  - src/modules/booking/entities/booking.entity.ts (OneToOne Shift, ManyToOne Professional, index on [professionalId, status])
+- Updated src/config/entities.ts to export [Facility, Professional, Shift, Booking]
+- Type aliases exported: FacilityType, Qualification, ShiftStatus, BookingStatus
+- Typecheck passes
 - **Learnings for future iterations:**
-  - The frontend types file at `apps/tictactoe/src/types/game.ts` has extra types (GameState, GameSummary) not needed in backend — only copied the shared subset
-  - The entity file already defines CellValue, GameMove, GameStatus, GameMode — there is now duplication between entity types and lib/game/types.ts. Future stories may want to consolidate by importing from lib/game/types.ts in the entity
-  - All 9 pure functions are available: checkWinner, isBoardFull, getAvailablePositions, getGameStatus, getCurrentTurn, isValidMove, applyMove, createEmptyBoard, formatBoardForDisplay
+  - Entity files go in `entities/` subdirectory under each module (e.g., `modules/shift/entities/`)
+  - `@Index` decorator for composite indexes goes at the class level (above `@Entity`), not on individual properties
+  - Cross-module entity imports use relative paths (e.g., booking.entity imports from `../../shift/entities/shift.entity`)
+  - `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy to ensure correct FK column naming
+  - `bookedAt` uses `default: () => 'NOW()'` (function form) for DB-level default
 ---
 
-## 2026-02-27 16:35 - US-003
-- Created GameModule with POST /api/games endpoint for creating games
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/dto/create-game.dto.ts` - CreateGameDto with @IsIn validation for mode field
-  - `apps/tictactoe-api/src/modules/game/dto/game-state.dto.ts` - GameStateDto and CreateGameResponseDto (game state + playerToken)
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - GameService with createGame() and toGameStateDto() helper
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - GameController with POST /api/games
-  - `apps/tictactoe-api/src/modules/game/game.module.ts` - GameModule importing TypeOrmModule.forFeature([Game])
-  - `apps/tictactoe-api/src/app.module.ts` - Registered GameModule in AppModule imports
-  - `apps/tictactoe-api/package.json` - Added class-validator and class-transformer dependencies
+## 2026-03-01 - US-003
+- Implemented Shift CRUD endpoints: create, list with filters, get by id, list facilities, list professionals
+- Files created:
+  - src/modules/shift/dto/create-shift.dto.ts (class-validator: IsUUID, IsIn, IsDateString, IsInt, Min)
+  - src/modules/shift/shift.service.ts (create, findAll, findOne, listFacilities, listProfessionals)
+  - src/modules/shift/shift.controller.ts (@Controller('api') with 5 endpoints)
+- Files modified:
+  - src/modules/shift/shift.module.ts (wired TypeOrmModule.forFeature, controller, service, exports)
+- Typecheck passes, pre-commit hooks pass
 - **Learnings for future iterations:**
-  - class-validator and class-transformer were already listed in package.json but not installed — pnpm install pulled them in
-  - Entity types (CellValue, GameMove, GameStatus, GameMode) are imported from game.entity.ts in DTOs — keeps a single source of truth within the game module
-  - GameStateDto maps boardState -> board to match the frontend's expected API shape
-  - playerToken is returned as a separate top-level field in CreateGameResponseDto, not part of GameStateDto
-  - ValidationPipe with whitelist:true strips unknown properties from request body
+  - Use `@Controller('api')` prefix so routes are /api/shifts, /api/facilities, /api/professionals (all under one controller)
+  - Use createQueryBuilder for findAll() to support optional where clauses via .andWhere() pattern
+  - Left join booking + professional in shift queries so response includes booking info when shift is booked
+  - Service validates business rules (facility exists, endTime > startTime) and throws NestJS exceptions (NotFoundException, BadRequestException)
+  - The prettier/prettier eslint rule fails on decorator files due to root @trivago/prettier-plugin-sort-imports — this is pre-existing and not a blocker (same in tictactoe-api)
 ---
 
-## 2026-02-27 17:00 - US-004
-- Added GET /api/games/:id endpoint to fetch game state
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added getGame() method with NotFoundException for missing games
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get(':id') endpoint returning GameStateDto
+## 2026-03-01 - US-004
+- Implemented booking endpoint with pessimistic locking for concurrent safety
+- Files created:
+  - src/modules/booking/dto/book-shift.dto.ts (class-validator: IsUUID for professionalId)
+  - src/modules/booking/booking.service.ts (bookShift with QueryRunner, pessimistic_write lock, transaction)
+  - src/modules/booking/booking.controller.ts (@Controller('api/shifts') with POST :id/book)
+- Files modified:
+  - src/modules/booking/booking.module.ts (wired TypeOrmModule.forFeature([Booking, Shift, Professional]), controller, service)
+- Typecheck passes, pre-commit hooks pass
 - **Learnings for future iterations:**
-  - toGameStateDto() already strips playerXToken and playerOToken — no extra work needed for security
-  - NotFoundException from @nestjs/common auto-returns 404 with descriptive JSON message
-  - Pre-commit eslint decorator parsing errors are pre-existing and not caused by changes — lint-staged still passes
+  - Use `DataSource.createQueryRunner()` for transactions — inject `DataSource` directly (not repositories) for QueryRunner pattern
+  - Pessimistic lock: `createQueryBuilder('entity').setLock('pessimistic_write').where(...).getOne()`
+  - Use `queryRunner.manager.getRepository(Entity)` inside transactions to ensure operations run within the transaction
+  - Booking controller uses `@Controller('api/shifts')` (not `@Controller('api')`) since all routes are under /api/shifts/:id/book
+  - Error codes: 404 (not found), 409 (already booked), 400 (qualification mismatch) — match PRD exactly
+- Seed scripts: use TypeORM `upsert()` with unique `name` column for idempotent seeding (requires unique constraint on entity)
+- CLI scripts load .env.local via `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` at top of file
 ---
 
-## 2026-02-27 17:20 - US-005
-- Added POST /api/games/:id/move endpoint for making moves with full game logic validation
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/dto/make-move.dto.ts` - Created MakeMoveDto with @IsInt, @Min(0), @Max(8) validation on position
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added makeMove() method with transaction, SELECT FOR UPDATE, game logic validation
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/move') endpoint with ValidationPipe
+## 2026-03-01 - US-005
+- Created seed script for 3 facilities and 5 professionals with upsert pattern
+- Files created:
+  - src/cli/seed.ts (TypeORM DataSource directly, upsert by name for idempotency)
+- Files modified:
+  - src/modules/shift/entities/facility.entity.ts (added unique: true to name column for upsert)
+  - src/modules/shift/entities/professional.entity.ts (added unique: true to name column for upsert)
+- Seed script already wired in package.json from US-001: `"seed": "ts-node --project tsconfig.json src/cli/seed.ts"`
+- Typecheck passes, pre-commit hooks pass
 - **Learnings for future iterations:**
-  - TypeORM `DataSource` is injectable without @Inject decorator — NestJS auto-resolves it from the TypeORM module
-  - Use `queryRunner.manager.getRepository(Game).createQueryBuilder('game').setLock('pessimistic_write')` for SELECT ... FOR UPDATE
-  - Board stored as JSONB in DB needs `as Board` cast when using with game logic functions expecting the 9-element tuple type
-  - Game logic functions imported from `../../lib/game/gameLogic` — relative path from modules/game/ directory
-  - `moveNumber` is 1-indexed: `game.moves.length + 1` before adding the new move
-  - Winner field on game over: set to 'X' or 'O' for wins, null for draws; currentTurn only flips on in_progress continuation
+  - TypeORM `upsert()` requires a unique constraint on the conflict column — added `unique: true` to entity `@Column` decorator
+  - CLI scripts create their own DataSource (not NestJS bootstrap) — load dotenv manually at top of file
+  - The `upsert(data, ['conflictColumn'])` second param is the column(s) to detect conflicts on
 ---
 
-## 2026-02-27 17:40 - US-006
-- Added GET /api/games endpoint to list recent games with optional limit
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added listGames(limit) method using repository.find with order and take
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Get() handler with @Query('limit') param, placed before @Get(':id') to avoid route conflicts
+## 2026-03-01 - US-006
+- Verified full backend end-to-end via curl tests, found and fixed 3 issues
+- Issues fixed:
+  1. Missing `tsconfig.build.json` — `nest start --watch` requires it (not just tsconfig.json)
+  2. `leftJoinAndSelect` in booking service caused "FOR UPDATE cannot be applied to nullable side of outer join" — changed to `innerJoinAndSelect`
+  3. Booking endpoint returned 201 instead of 200 — added `@HttpCode(200)` decorator
+- Files created:
+  - tsconfig.build.json (extends tsconfig.json, excludes test/spec files)
+- Files modified:
+  - src/modules/booking/booking.service.ts (leftJoinAndSelect → innerJoinAndSelect for pessimistic lock query)
+  - src/modules/booking/booking.controller.ts (added @HttpCode(200) import and decorator)
+- All curl tests verified:
+  - GET /api/facilities → 3 facilities with UUIDs
+  - GET /api/professionals → 5 professionals with UUIDs
+  - POST /api/shifts → 201 with facility name
+  - GET /api/shifts → returns created shifts with facility and booking data
+  - POST /api/shifts/:id/book → 200 with booking and professional details
+  - Duplicate booking → 409 "Shift is already booked"
+  - Qualification mismatch → 400 with descriptive message
+  - Invalid POST → 400 with validation error array
+- Typecheck passes
 - **Learnings for future iterations:**
-  - Route order matters in NestJS controllers: @Get() must come before @Get(':id') or the parameterized route will catch all requests
-  - Query params come as strings — parse to int before passing to service, with fallback to undefined for default
-  - Lint auto-fixed `limit: number = 20` to `limit = 20` (type inference from default value)
-  - toGameStateDto() already strips player tokens so listGames response is safe by default
+  - Always include `tsconfig.build.json` when scaffolding NestJS apps — it's required by `nest start --watch` and `nest build`
+  - When using `setLock('pessimistic_write')` with TypeORM, never use `leftJoinAndSelect` — PostgreSQL FOR UPDATE does not support nullable outer joins. Use `innerJoinAndSelect` for required relations.
+  - NestJS defaults POST to 201 — use `@HttpCode(200)` when the endpoint updates rather than creates
 ---
 
-## 2026-02-27 18:00 - US-007
-- Added POST /api/games/:id/join endpoint for Player O to join PvP games
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added joinGame() method with mode validation, conflict check, and playerOToken generation
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added @Post(':id/join') endpoint returning CreateGameResponseDto
+## 2026-03-01 - US-007
+- Scaffolded apps/shift-ui/ with Next.js 14, Tailwind, shadcn/ui, types, and API client
+- Files created:
+  - package.json (no Apollo, GraphQL, Socket.io deps; dev server on port 2026)
+  - tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts
+  - .env.example, .env.local (NEXT_PUBLIC_API_URL=http://localhost:3003)
+  - src/app/globals.css (Tailwind base + shadcn theme variables)
+  - src/lib/utils.ts (cn() utility)
+  - src/components/ui/badge.tsx, button.tsx, card.tsx (copied from tictactoe)
+  - src/types/shift.ts (FacilityType, Qualification, ShiftStatus, Facility, Professional, BookingInfo, Shift interfaces)
+  - src/lib/api/shiftApi.ts (apiFetch wrapper + listFacilities, listProfessionals, createShift, listShifts, getShift, bookShift)
+  - src/app/layout.tsx (nav bar with links to /facility and /professional)
+  - src/app/page.tsx (landing page with links to both dashboards)
+  - src/app/facility/page.tsx (placeholder for US-008)
+  - src/app/professional/page.tsx (placeholder for US-009)
+- Files modified:
+  - .prettierignore (added apps/shift-ui to avoid root @trivago/prettier-plugin-sort-imports issues)
+- pnpm install succeeded, typecheck passes, `next dev` starts on port 2026
 - **Learnings for future iterations:**
-  - ConflictException from @nestjs/common auto-returns 409 with descriptive JSON message — same pattern as NotFoundException for 404
-  - joinGame reuses CreateGameResponseDto (game state + playerToken) — same response shape as createGame since both return a token to the caller
-  - No ValidationPipe needed on join endpoint since there's no request body to validate
-  - Route placed before :id/move to maintain clean route ordering (though NestJS resolves literal segments before params so it works either way)
+  - Next.js apps also need to be in root `.prettierignore` to avoid root prettier plugin conflicts
+  - No select.tsx component exists in tictactoe — will need native HTML selects or a custom component for the dashboard dropdowns
+  - The API error handling pattern extracts `body.message` from JSON responses and attaches `status` code as a property on the Error object — useful for distinguishing 400/409/404 errors in the UI
+  - Placeholder pages for /facility and /professional routes ensure Next.js routing works immediately
 ---
 
-## 2026-02-27 18:30 - US-008
-- Migrated AI pipeline to NestJS backend
-- Files changed:
-  - `apps/tictactoe-api/src/modules/ai/ai.module.ts` - Created AiModule exporting AiService
-  - `apps/tictactoe-api/src/modules/ai/ai.service.ts` - Created AiService with generateMove(board) method, defense-in-depth isValidMove check
-  - `apps/tictactoe-api/src/modules/ai/move-graph.ts` - Copied from frontend, updated imports to relative paths
-  - `apps/tictactoe-api/src/modules/ai/nodes.ts` - Copied from frontend, updated imports: `../../lib/game/gameLogic` and local AI modules
-  - `apps/tictactoe-api/src/modules/ai/graph-state.ts` - Copied from frontend, updated Board import to `../../lib/game/types`
-  - `apps/tictactoe-api/src/modules/ai/move-validator.ts` - Copied verbatim (no import changes needed, only uses zod)
-  - `apps/tictactoe-api/src/modules/ai/llm.ts` - Copied verbatim (uses @langchain/aws, env vars for credentials)
-  - `apps/tictactoe-api/src/modules/ai/move-prompt.ts` - Copied verbatim (uses @langchain/core/prompts)
-  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added AiModule to imports
-  - `apps/tictactoe-api/package.json` - Added @langchain/aws, @langchain/core, @langchain/langgraph, zod; upgraded NestJS to v10, TypeScript to v5.9
-  - `apps/tictactoe-api/.env.local` - Added AI_AWS_BEDROCK_* env vars
-  - `apps/tictactoe-api/.env.example` - Added AI_AWS_BEDROCK_* env vars
+## 2026-03-01 - US-008
+- Implemented facility dashboard page with facility selector, shift creation form, and shift list
+- Files modified:
+  - src/app/facility/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a facility (populated from GET /api/facilities on mount)
+  - Form to post new shifts: qualification dropdown (CNA/LPN/RN), datetime-local inputs, pay rate in dollars (converted to cents)
+  - Shift list filtered by selected facility (fetched with status=all, filtered client-side by facilityId)
+  - Status badges: default variant for 'open', secondary variant for 'booked'
+  - Pay rate displayed as dollars (payRateCents / 100).toFixed(2)
+  - Professional name shown for booked shifts
+  - Loading and error states handled
+- Typecheck passes, pre-commit hooks pass
 - **Learnings for future iterations:**
-  - Zod v4 (4.3.6) is pulled in as a transitive dep from @langchain/core — its .d.cts files are incompatible with TypeScript 4.9 (skipLibCheck doesn't skip .d.cts). Must use TypeScript 5.x.
-  - NestJS 8's @Inject/@InjectRepository parameter decorator types are incompatible with TypeScript 5.x (TS1239 error). Upgrading to NestJS 10 fixes this.
-  - The NestJS v8 -> v10 + TS 4.9 -> 5.9 upgrade was necessary for the langchain dependency chain: @langchain/core -> zod v4 -> requires TS 5.x -> requires NestJS 10
-  - AI files use kebab-case filenames in backend (move-graph.ts vs moveGraph.ts in frontend) to match backend conventions
-  - zod@3.25.32 is installed as direct dependency for the move-validator.ts; zod@4.3.6 exists as transitive from @langchain/core
-  - AiService wraps the LangGraph pipeline with a defense-in-depth isValidMove() check after AI generates a move
+  - Backend GET /api/shifts does not support filtering by facilityId — must fetch with status=all and filter client-side
+  - Use native HTML select elements (no shadcn Select component available) — style with border-input bg-background classes to match theme
+  - datetime-local input type works well for shift start/end times — converts to ISO string via new Date(value).toISOString()
+  - Form state should reset after successful submission, and shift list should refetch
+  - useCallback for fetchShifts ensures it's a stable dependency for useEffect when selectedFacilityId changes
 ---
 
-## 2026-02-27 19:00 - US-009
-- Integrated AI move into makeMove endpoint — after human move in AI mode, backend auto-triggers AI counter-move
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected AiService, added AI move logic after human move in AI mode, added InternalServerErrorException for AI failures
+## 2026-03-01 - US-009
+- Implemented professional dashboard page with professional selector, available shifts, booking, and my shifts sections
+- Files modified:
+  - src/app/professional/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a professional (populated from GET /api/professionals on mount, shows qualification)
+  - Available shifts section: filtered by selected professional's qualification via server query param
+  - Each available shift shows: facility name, qualification badge, time window, pay rate, Book button
+  - Book button calls POST /api/shifts/:id/book with selected professional's ID
+  - On success: refetches both available and booked shifts
+  - Inline error messages per shift for 409 (already booked) and 400 (qualification mismatch)
+  - My Shifts section: fetches booked shifts filtered client-side by professionalId
+  - Loading and error states handled
+- Typecheck passes, lint passes
 - **Learnings for future iterations:**
-  - AiService is already available in GameModule via AiModule import (set up in US-008) — just needs constructor injection in GameService
-  - AI always plays 'O' — no need to parameterize the player for AI moves
-  - The AI move block only fires when `game.mode === 'ai' && game.status === 'in_progress'` — this means it correctly skips when the human move already ends the game (X wins or draw)
-  - Both human and AI moves are committed in the same transaction — if AI fails, the whole transaction rolls back cleanly
-  - `catch {}` (empty catch binding) is valid in TypeScript 5.9 — no need for `catch (_error)`
-  - The response bundles both moves so frontend gets complete state in one round trip (no separate AI endpoint needed)
+  - Use per-shift error state (Record<string, string>) for inline error messages on individual shift rows
+  - Use per-shift booking-in-progress state (Record<string, boolean>) to disable individual Book buttons during requests
+  - Fetch available and booked shifts in parallel with Promise.all for better performance
+  - Import ApiError type from shiftApi.ts to properly type error handling in catch blocks
+  - Professional selector shows qualification in parentheses (e.g., "Alice Johnson (RN)") for better UX
 ---
 
-## 2026-02-27 20:00 - US-010
-- Added PvP player token validation to makeMove endpoint
-- Files changed:
-  - `apps/tictactoe-api/src/modules/game/game.controller.ts` - Added `@Headers('x-player-token')` param to makeMove, passes to service
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Added `playerToken` param to makeMove(), PvP token validation with ForbiddenException
+## 2026-03-01 - US-010
+- End-to-end verification across both dashboards — all acceptance criteria verified
+- No code changes needed — all functionality works correctly
+- Verification steps completed:
+  1. Facility dashboard: selected Sunrise Nursing Home, posted CNA shift ($25/hr), confirmed listed as 'open'
+  2. Professional dashboard: selected Bob Smith (CNA), saw CNA shift in available list, booked it successfully (200)
+  3. Professional dashboard: shift moved to My Shifts section (filtered by professionalId)
+  4. Facility dashboard: refreshed shows shift as 'booked' with Bob Smith displayed
+  5. Professional dashboard: David Brown (CNA) — booked CNA shift NOT in available list (0 open CNA shifts)
+  6. Professional dashboard: Alice Johnson (RN) — CNA shift does NOT appear (qualification filter works)
+  7. Facility dashboard: posted RN shift at Metro General Hospital ($45/hr)
+  8. Professional dashboard as Alice Johnson (RN): saw the RN shift, booked it successfully
+  9. Both dashboards reflect correct state: CNA booked by Bob, RN booked by Alice
+  10. Extra verifications: duplicate booking → 409 "Shift is already booked", qualification mismatch → 400
+- Frontend pages all respond with 200: /, /facility, /professional
+- Typecheck passes on both shift-api and shift-ui
 - **Learnings for future iterations:**
-  - `@Headers('x-player-token')` returns `string | undefined` — NestJS auto-extracts the header value by name
-  - ForbiddenException from @nestjs/common auto-returns 403 — same pattern as NotFoundException (404), ConflictException (409), BadRequestException (400)
-  - Token validation is placed after the `in_progress` check but before `isValidMove` — order matters for meaningful error messages
-  - AI mode skips token validation entirely (guard clause: `if (game.mode === 'pvp')`) — human is always X in AI mode so no token needed
-  - `ConflictException` was already imported but unused warning didn't trigger because lint-staged scopes to changed files
----
-
-## 2026-02-27 20:30 - US-011
-- Created frontend REST API client at apps/tictactoe/src/lib/api/gameApi.ts
-- Files changed:
-  - `apps/tictactoe/src/lib/api/gameApi.ts` - New file: fetch-based API client with createGame, getGame, makeMove, joinGame, listGames functions
-  - `apps/tictactoe/.env.example` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
-  - `apps/tictactoe/.env.local` - Added NEXT_PUBLIC_API_URL=http://localhost:3002
-- **Learnings for future iterations:**
-  - Frontend types for API responses are defined locally in gameApi.ts (GameStateDto, CreateGameResponse) rather than importing from backend — keeps frontend decoupled from backend module structure
-  - The backend GameStateDto has `board: CellValue[]` (array) while frontend Game types use `Board` (9-element tuple) — consuming code may need to cast
-  - `createdAt` and `updatedAt` are typed as `string` in frontend DTO (JSON serializes dates as ISO strings), not `Date` as in backend DTO
-  - Generic `apiFetch<T>()` helper centralizes error handling with status code + response text in error message
-  - X-Player-Token header is only included when playerToken is provided — works for both AI mode (no token) and PvP mode (with token)
-  - .env.local is NOT committed (contains credentials) — only .env.example is committed
----
-
-## 2026-02-27 21:00 - US-012
-- Created unified game board page at /game/[id] that loads game by ID and handles moves via REST API
-- Files changed:
-  - `apps/tictactoe/src/app/game/[id]/page.tsx` - New 'use client' page: fetches game state via getGame(), renders GameBoard/GameStatus/NewGameButton, handles moves via makeMove() API, reads playerToken from localStorage
-- **Learnings for future iterations:**
-  - `useParams<{ id: string }>()` from next/navigation provides typed dynamic route params in Next.js app router
-  - GameStateDto.board is `CellValue[]` (array) but GameBoard expects `Board` (9-element tuple) — cast with `as Board`
-  - AI mode: set isAiThinking=true before makeMove call since the response bundles both human and AI moves (one round trip)
-  - PvP mode: read playerToken from localStorage with key `playerToken-{gameId}` — this is set by the create/join pages
-  - NewGameButton navigates back to `/` (AI) or `/x` (PvP) depending on game mode
-  - Error handling: check for '404' in error message for game-not-found, show generic error for other failures
----
-
-## 2026-02-27 21:30 - US-013
-- Refactored AI mode landing page at / to create game via REST API and redirect to /game/[id]
-- Files changed:
-  - `apps/tictactoe/src/app/page.tsx` - Replaced local game state management with createGame('ai') API call + router.push() redirect; kept GameHistorySidebar visible during loading
-- **Learnings for future iterations:**
-  - Used `useRef` (creatingRef) to prevent double-creation in React StrictMode (useEffect fires twice in dev)
-  - The page is now much simpler: ~60 lines vs ~175 lines — just create game, store token, redirect
-  - Game history sidebar still uses the existing `useGameHistory` GraphQL hook — will be migrated to REST in US-023
-  - localStorage key format `playerToken-{gameId}` matches what /game/[id] page reads
-  - Error state includes a "Try Again" button that reloads the page to re-trigger game creation
----
-
-## 2026-02-27 22:00 - US-014
-- Created PvP Player X page at /x that creates a PvP game and shows a shareable link for Player O
-- Files changed:
-  - `apps/tictactoe/src/app/x/page.tsx` - New 'use client' page: creates PvP game via createGame('pvp'), stores playerToken in localStorage, displays shareable /o?game={id} link with copy-to-clipboard, "Go to Game" button navigates to /game/{id}
-- **Learnings for future iterations:**
-  - Same `useRef` (creatingRef) pattern as page.tsx to prevent double-creation in React StrictMode
-  - `navigator.clipboard.writeText()` is used for copy-to-clipboard — show "Copied!" briefly with setTimeout (2 seconds)
-  - Share link uses `window.location.origin` for dynamic origin — wrapped in ternary for SSR safety (typeof window check)
-  - Prettier requires breaking long template literals across multiple lines when they contain ternary expressions
-  - The page has 3 states: loading (creating game), share link view (game created, showing link + "Go to Game"), and error state
----
-
-## 2026-02-27 22:30 - US-015
-- Created PvP Player O page at /o that joins an existing PvP game via invite link
-- Files changed:
-  - `apps/tictactoe/src/app/o/page.tsx` - New 'use client' page: reads `game` query param via useSearchParams(), calls joinGame(), stores playerToken in localStorage, redirects to /game/{id}. Wrapped in Suspense boundary.
-- **Learnings for future iterations:**
-  - `useSearchParams()` requires a Suspense boundary in Next.js 14 app router — wrap content component in Suspense with a fallback
-  - To avoid ESLint `no-non-null-assertion` warning, capture nullable value in a local const after the null check (e.g., `const id = gameId;`) and use that in the async function instead of `gameId!`
-  - Prettier collapses single-line strings — don't wrap short string arguments across multiple lines with `setError(\n...\n)`, keep them on one line
-  - Same `useRef` (joiningRef) pattern as page.tsx and /x to prevent double API calls in React StrictMode
-  - Error handling parses API error messages for status codes (409=already joined, 404=not found, 400=not PvP) to show user-friendly messages
----
-
-## 2026-02-27 23:00 - US-016
-- Removed frontend AI pipeline and old game logic, cleaned up dependencies
-- Files changed:
-  - `apps/tictactoe/src/app/api/ai-move/route.ts` - Deleted (Next.js AI route handler, no longer needed)
-  - `apps/tictactoe/src/lib/ai/` - Deleted entire directory (6 files: graphState.ts, llm.ts, moveGraph.ts, movePrompt.ts, moveValidator.ts, nodes.ts)
-  - `apps/tictactoe/src/lib/game/gameLogic.ts` - Deleted (pure game logic, now lives in backend at apps/tictactoe-api/src/lib/game/gameLogic.ts)
-  - `apps/tictactoe/package.json` - Removed @langchain/aws, @langchain/core, @langchain/langgraph, zod; added socket.io-client
-  - `pnpm-lock.yaml` - Updated after dependency changes
-- **Learnings for future iterations:**
-  - No surviving files imported from `@/lib/ai/` or `@/lib/game/gameLogic` — all references were contained within the deleted files themselves
-  - The `@/types/game` types file is NOT deleted — it's still used by components (Cell, GameBoard, GameStatus, GameHistoryItem), API client (gameApi.ts), and GraphQL transforms
-  - Empty directories (app/api/, lib/game/) were cleaned up after file deletion
-  - Frontend build size decreased significantly after removing heavy langchain dependencies
-  - socket.io-client added now for US-020 (frontend WebSocket hook) — best to add it when removing deps to keep the package.json change atomic
----
-
-## 2026-02-27 23:30 - US-017
-- Updated GameStatus component to support AI and PvP mode-specific messages
-- Files changed:
-  - `apps/tictactoe/src/components/GameStatus.tsx` - Added mode, playerSide, and currentTurn props to interface; created separate aiMessages and pvpMessages Records; branches on mode to select message set
-  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Passes mode and currentTurn from game state to GameStatus component
-- **Learnings for future iterations:**
-  - GameStatus props: mode (default 'ai'), playerSide (optional, for future personalization), currentTurn (default 'X') — backward compatible since all new props have defaults
-  - PvP in_progress uses `currentTurn` for "X's turn" / "O's turn" messages; `playerSide` is in the interface for future "Your turn" personalization but not actively used yet
-  - AI mode messages unchanged: 'Your turn (X)', 'You win!', 'AI wins!', 'It is a draw!'
-  - PvP mode messages: "{currentTurn}'s turn", 'X wins!', 'O wins!', 'It is a draw!'
-  - The `playerSide` prop is accepted but not destructured to avoid ESLint unused variable warnings — consumers can pass it and it will be available when needed
----
-
-## 2026-02-27 24:00 - US-018
-- Added Redis service to Docker infrastructure for Socket.IO adapter (used in US-019)
-- Files changed:
-  - `apps/tictactoe-api/docker-compose.yml` - Added redis service: redis:7-alpine, container tictactoe-redis, port 6379:6379, restart unless-stopped
-  - `apps/tictactoe-api/.env.local` - Added REDIS_HOST=localhost and REDIS_PORT=6379
-  - `apps/tictactoe-api/.env.example` - Added REDIS_HOST=localhost and REDIS_PORT=6379
-- **Learnings for future iterations:**
-  - Redis alpine image is ~30MB — pulls quickly
-  - No application code changes needed for this story — purely infrastructure
-  - Redis accessible at localhost:6379, verified via `docker exec tictactoe-redis redis-cli ping` → PONG
-  - docker-compose up -d starts both PostgreSQL and Redis containers successfully
----
-
-## 2026-02-27 - US-019
-- Implemented WebSocket gateway for PvP real-time updates
-- Files changed:
-  - `apps/tictactoe-api/package.json` - Added @nestjs/websockets, @nestjs/platform-socket.io (v10), socket.io, @socket.io/redis-adapter, ioredis
-  - `apps/tictactoe-api/src/modules/game/game.gateway.ts` - New file: WebSocket gateway with /game namespace, Redis adapter, joinGame handler, broadcastGameUpdate method
-  - `apps/tictactoe-api/src/modules/game/game.module.ts` - Added GameGateway to providers array
-  - `apps/tictactoe-api/src/modules/game/game.service.ts` - Injected GameGateway, calls broadcastGameUpdate() after successful PvP moves
-  - `pnpm-lock.yaml` - Updated with new WebSocket dependencies
-- **Learnings for future iterations:**
-  - @nestjs/websockets and @nestjs/platform-socket.io versions MUST match @nestjs/core version — v11 requires @nestjs/common v11. Since we use NestJS 10, must install v10.x specifically
-  - OnGatewayInit.afterInit(server) is the correct lifecycle hook for configuring the Redis adapter — the server instance is passed as parameter
-  - ioredis `pubClient.duplicate()` creates a matching sub client for the Redis adapter — avoids creating two separate Redis instances
-  - GameGateway broadcast is placed AFTER queryRunner.commitTransaction() to ensure the DB state is committed before clients receive the update
-  - The broadcast only fires for PvP mode moves (`game.mode === 'pvp'`) — AI mode doesn't need WebSocket updates
-  - Socket.IO rooms use `game-{gameId}` naming convention; clients emit `joinGame` with `{ gameId }` to join
----
-
-## 2026-02-27 - US-020
-- Created frontend WebSocket hook for PvP real-time updates and integrated it into the game page
-- Files changed:
-  - `apps/tictactoe/src/lib/api/useGameSocket.ts` - New React hook: connects to Socket.IO /game namespace in PvP mode, emits joinGame on connect, listens for gameUpdate events, cleans up on unmount
-  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Added useGameSocket call: passes gameId (null until game loaded), game mode, and setGame callback for real-time updates
-- **Learnings for future iterations:**
-  - Use `useRef` for the onUpdate callback to avoid socket reconnections when the callback identity changes (common React pattern for event handlers in effects)
-  - The hook passes `game ? gameId : null` as first arg to delay socket connection until the game is loaded and mode is known — avoids connecting with wrong mode
-  - `game?.mode ?? 'ai'` defaults to 'ai' before game loads, so the hook does nothing (no-op for AI mode) — safe default
-  - socket.io-client was already added to package.json in US-016 — no additional dependency install needed
-  - The hook is intentionally simple: no reconnection logic or error handling beyond socket.io-client defaults — socket.io handles reconnection automatically
----
-
-## 2026-02-27 - US-021
-- Implemented PostGraphile read-only security via PostgreSQL roles
-- Files changed:
-  - `apps/tictactoe-api/src/migrations/1772320000000-CreatePostgraphileReadOnlyRole.ts` - New migration: creates postgraphile_user role with LOGIN, grants SELECT on game table, revokes INSERT/UPDATE/DELETE
-  - `apps/tictactoe-api/src/config/graphile.ts` - Updated PostGraphile config to use POSTGRAPHILE_USER/POSTGRAPHILE_PASSWORD env vars instead of the main postgres superuser
-  - `apps/tictactoe-api/.env.local` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
-  - `apps/tictactoe-api/.env.example` - Added POSTGRAPHILE_USER and POSTGRAPHILE_PASSWORD
-  - `scripts/ralph/prd.json` - Marked US-021 as passes: true
-- **Learnings for future iterations:**
-  - Use `DO $$ BEGIN IF NOT EXISTS ... END $$` pattern for idempotent role creation — avoids errors if migration is re-run
-  - Two separate DB connections coexist: TypeORM uses postgres superuser (full read/write for GameService), PostGraphile uses postgraphile_user (SELECT only)
-  - `GRANT CONNECT ON DATABASE` and `GRANT USAGE ON SCHEMA public` are needed in addition to table-level GRANT SELECT — without these the role can't even access the schema
-  - Verified with psql: SELECT works, INSERT/UPDATE/DELETE all return "permission denied for table game"
-  - The PostGraphile config in graphile.ts overrides only `user` and `password` fields — host, port, and database are shared from the common postgres config
----
-
-## 2026-02-27 - US-022
-- Added mode toggle UI component for switching between AI and PvP modes
-- Files changed:
-  - `apps/tictactoe/src/components/ModeToggle.tsx` - New component: two buttons ("Play vs AI" / "Play vs Human") using Button component with default/outline variants to indicate current mode
-  - `apps/tictactoe/src/app/game/[id]/page.tsx` - Imported ModeToggle, placed between title and GameStatus; onSelectMode navigates to `/` (AI) or `/x` (PvP)
-- **Learnings for future iterations:**
-  - The existing Button component with `variant` prop (default vs outline) provides a clean toggle pattern — no need for a dedicated toggle/tab component
-  - ModeToggle accepts `currentMode` and `onSelectMode` — current mode is highlighted with `default` variant, other mode uses `outline`
-  - Navigation to `/` creates a new AI game, navigation to `/x` creates a new PvP game — the existing page.tsx and /x/page.tsx handle creation on mount
-  - Component placed between the h1 title and GameStatus for visual prominence without cluttering the board area
----
-
-## 2026-02-27 - US-023
-- Added mode labels to game history sidebar and migrated history fetching from GraphQL to REST API
-- Files changed:
-  - `apps/tictactoe/src/types/game.ts` - Added GameMode type ('ai' | 'pvp') and mode field to GameSummary interface
-  - `apps/tictactoe/src/components/GameHistoryItem.tsx` - Added mode badge (AI with secondary variant, PvP with outline variant) next to result badge; in_progress games no longer show a result badge
-  - `apps/tictactoe/src/lib/graphql/hooks.ts` - Replaced GraphQL apolloClient.query with REST listGames() from gameApi; maps GameStateDto to GameSummary with mode field
-  - `apps/tictactoe/src/lib/graphql/transforms.ts` - Added mode field to GraphQLGameNode type and transformGameToSummary output (for type compatibility)
-  - `scripts/ralph/prd.json` - Marked US-023 as passes: true
-- **Learnings for future iterations:**
-  - When adding a required field to a shared type like GameSummary, ALL consumers must be updated — including transform functions that may not be actively used anymore
-  - The useGameHistory hook still lives in lib/graphql/hooks.ts despite now using REST — a future cleanup could move it to lib/api/ or rename the directory
-  - Badge component supports 4 variants: default, secondary, destructive, outline — secondary (muted bg) for AI and outline (border only) for PvP provides good visual distinction
-  - getResultBadge returns null for in_progress games (no result badge) — previously it always returned a Draw badge as default
+  - Full E2E verification via curl is reliable for testing API + state transitions without browser tools
+  - The client-side filtering pattern (fetch all, filter by facilityId or professionalId) works well for POC scale
+  - All error codes are consistent: 409 for duplicate booking, 400 for qualification mismatch, 404 for missing entities
 ---

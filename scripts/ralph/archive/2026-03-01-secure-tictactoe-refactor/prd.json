@@ -21,7 +21,7 @@
 				"Typecheck passes"
 			],
 			"priority": 1,
-			"passes": true,
+			"passes": false,
 			"notes": "Reference apps/tictactoe-api/ for all patterns. Port 54323 for Postgres (54321 = realty-ai, 54322 = tictactoe). Create placeholder ShiftModule and BookingModule (empty modules) so app.module.ts compiles."
 		},
 		{
@@ -38,7 +38,7 @@
 				"Typecheck passes"
 			],
 			"priority": 2,
-			"passes": true,
+			"passes": false,
 			"notes": "Use SnakeNamingStrategy (camelCase in TS -> snake_case in DB). Export type aliases: FacilityType = 'nursing_home' | 'hospital' | 'clinic', Qualification = 'CNA' | 'LPN' | 'RN', ShiftStatus = 'open' | 'booked' | 'completed' | 'cancelled', BookingStatus = 'confirmed' | 'completed' | 'cancelled'. See docs/clipboard-health-implementation-plan.md for exact entity definitions."
 		},
 		{
@@ -59,7 +59,7 @@
 				"Typecheck passes"
 			],
 			"priority": 3,
-			"passes": true,
+			"passes": false,
 			"notes": "Use @Controller('api') prefix so routes are /api/shifts, /api/facilities, /api/professionals. Use query builder for findAll() to support optional filters. Left join booking and professional so response includes booking info when shift is booked. See docs/clipboard-health-implementation-plan.md for detailed service method specs."
 		},
 		{
@@ -77,7 +77,7 @@
 				"Typecheck passes"
 			],
 			"priority": 4,
-			"passes": true,
+			"passes": false,
 			"notes": "Use DataSource.createQueryRunner() pattern from tictactoe-api GameService.makeMove(). Lock via createQueryBuilder('shift').setLock('pessimistic_write'). Qualification mismatch message format: \"Professional qualification 'X' does not match required 'Y'\". See docs/clipboard-health-implementation-plan.md for exact bookShift implementation."
 		},
 		{
@@ -92,7 +92,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": true,
+			"passes": false,
 			"notes": "Use TypeORM DataSource directly (not NestJS app bootstrap) for the CLI script. Upsert by name to be idempotent. The seed script should create its own DataSource connection, run the seed, then close the connection."
 		},
 		{
@@ -113,7 +113,7 @@
 				"Invalid POST requests return 400 with descriptive validation errors"
 			],
 			"priority": 6,
-			"passes": true,
+			"passes": false,
 			"notes": "This is a verification story — fix any issues found during testing. Run docker:up, dev, and seed before curl tests. Use actual UUIDs from seed response in subsequent curl commands."
 		},
 		{
@@ -136,7 +136,7 @@
 				"Typecheck passes"
 			],
 			"priority": 7,
-			"passes": true,
+			"passes": false,
 			"notes": "Reference apps/tictactoe/ for all frontend patterns. API client pattern from apps/tictactoe/src/lib/api/gameApi.ts. NEXT_PUBLIC_API_URL defaults to http://localhost:3003. Also create .env.local with the same value."
 		},
 		{
@@ -155,7 +155,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 8,
-			"passes": true,
+			"passes": false,
 			"notes": "Use Badge component for status (variant: default/green for open, secondary/blue for booked). Pay rate display: (payRateCents / 100).toFixed(2). Fetch shifts whenever selected facility changes. Form resets after successful submission."
 		},
 		{
@@ -177,7 +177,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 9,
-			"passes": true,
+			"passes": false,
 			"notes": "Available shifts: filter by qualification on the server via query param. My Shifts: fetch booked shifts and filter client-side where booking.professionalId matches selected professional. Error messages should appear inline near the shift that failed, then auto-clear or persist until dismissed."
 		},
 		{
@@ -197,7 +197,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 10,
-			"passes": true,
+			"passes": false,
 			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: shift-api on 3003, shift-ui on 2026. Database must be seeded."
 		}
 	]

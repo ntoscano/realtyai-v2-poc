@@ -1,0 +1,13 @@
+## Codebase Patterns
+- NestJS 10 + TypeScript 5.9 — required for zod v4 compatibility (transitive dep from @langchain/core in tictactoe-api)
+- SnakeNamingStrategy: camelCase in TypeScript -> snake_case in DB columns (automatic via TypeORM config)
+- PostgreSQL ports: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace
+- Use `synchronize: true` for POC apps — no migrations needed
+- class-validator DTOs for input validation at controller layer
+- Use DataSource.createQueryRunner() + setLock('pessimistic_write') for transactional operations with row locking
+- Pre-commit hooks: husky + lint-staged (eslint + prettier)
+- Typecheck: `pnpm typecheck` from the app directory
+- Frontend API client pattern: generic apiFetch<T>() wrapper in lib/api/ with typed functions per endpoint
+- shadcn/ui components in src/components/ui/ — copy from apps/tictactoe/src/components/ui/
+
+# Ralph Progress Log
