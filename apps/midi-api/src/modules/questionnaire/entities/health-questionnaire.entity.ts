@@ -11,10 +11,7 @@ import {
 import { Patient } from '../../patient/entities/patient.entity';
 
 export type Severity = 'mild' | 'moderate' | 'severe';
-export type MenopauseStage =
-	| 'perimenopause'
-	| 'menopause'
-	| 'post_menopause';
+export type MenopauseStage = 'perimenopause' | 'menopause' | 'post_menopause';
 
 @Index(['patientId'])
 @Entity('health_questionnaire')
