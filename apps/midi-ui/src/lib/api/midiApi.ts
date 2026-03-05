@@ -1,14 +1,15 @@
 import type {
 	Appointment,
 	AvailabilitySlot,
+	CancelledBy,
+	CareGoal,
 	Clinician,
 	HealthQuestionnaire,
 	MatchedClinician,
+	MenopauseStage,
 	Patient,
 	Severity,
 	Symptom,
-	CareGoal,
-	MenopauseStage,
 	VisitType,
 } from '@/types';
 
@@ -136,10 +137,20 @@ export async function listAppointments(
 	return apiFetch<Appointment[]>(`/api/appointments${qs ? `?${qs}` : ''}`);
 }
 
-export async function cancelAppointment(id: string): Promise<Appointment> {
+export async function cancelAppointment(
+	id: string,
+	cancelledBy: CancelledBy = 'patient',
+): Promise<Appointment> {
 	return apiFetch<Appointment>(`/api/appointments/${id}`, {
 		method: 'PATCH',
-		body: JSON.stringify({ status: 'cancelled', cancelledBy: 'patient' }),
+		body: JSON.stringify({ status: 'cancelled', cancelledBy }),
+	});
+}
+
+export async function completeAppointment(id: string): Promise<Appointment> {
+	return apiFetch<Appointment>(`/api/appointments/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify({ status: 'completed' }),
 	});
 }
 

@@ -248,7 +248,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 12,
-			"passes": false,
+			"passes": true,
 			"notes": "Badge colors for appointment status: use variant classes — blue for scheduled, green for completed, gray for cancelled, red for no_show. Only show Cancel/Complete buttons for appointments with status 'scheduled'. After cancelling, the freed slot should appear if clinician views their slots elsewhere."
 		},
 		{

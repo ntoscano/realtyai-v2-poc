@@ -189,3 +189,24 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - eslint --fix resolves all prettier formatting — run it before commit to avoid lint issues
   - ApiError type cast pattern: `const apiErr = err as ApiError; if (apiErr.status === 409)` for typed error handling
 ---
+
+## 2026-03-04 - US-012
+- Implemented clinician dashboard page at src/app/clinician/page.tsx
+- Updated midiApi.ts: added completeAppointment function, updated cancelAppointment to accept cancelledBy parameter
+- Features implemented:
+  - Clinician selector dropdown (populated from GET /api/clinicians, shows name + credential)
+  - Profile section: name, credential, specialties (primary highlighted with default Badge), licensed states, rating, years experience
+  - Appointments list from GET /api/appointments?clinician_id=X
+  - Status badges with color coding: blue=scheduled, green=completed, gray=cancelled, red=no_show (using className override on outline Badge variant)
+  - Cancel button on scheduled appointments: PATCH with status:cancelled, cancelledBy:clinician
+  - Complete button on scheduled appointments: PATCH with status:completed
+  - Loading and error states handled throughout
+  - Inline action loading state prevents double-clicks
+- Files modified: src/app/clinician/page.tsx (full implementation replacing placeholder), src/lib/api/midiApi.ts (added completeAppointment, updated cancelAppointment signature)
+- Files also modified: scripts/ralph/prd.json (US-012 passes: true)
+- **Learnings for future iterations:**
+  - Badge component doesn't have built-in color variants for status — use className override with outline variant for custom colors
+  - cancelAppointment needed cancelledBy parameter to support both patient and clinician cancellation
+  - Clinician detail endpoint (GET /api/clinicians/:id) returns clinicianSpecialties and stateLicenses when loaded via findOne
+  - GET /api/clinicians (listClinicians) also returns relations — can reuse for both dropdown and profile display
+---
