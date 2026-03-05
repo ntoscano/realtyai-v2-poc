@@ -5,6 +5,7 @@ apps/realty-ai-api
 apps/tictactoe-api
 apps/shift-api
 apps/shift-ui
+apps/midi-api
 
 # debug
 npm-debug.log*

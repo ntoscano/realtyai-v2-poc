@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: midi-matching-postgres
+    ports:
+      - '54324:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docker
+      POSTGRES_DB: midi_matching
+    volumes:
+      - midi_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  midi_pgdata:
