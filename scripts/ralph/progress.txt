@@ -1,236 +1,234 @@
 # Ralph Progress Log
-Started: Sun Mar  1 18:47:22 PST 2026
+Started: Wed Mar  4 16:37:23 PST 2026
 
 ## Codebase Patterns
-- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace
-- NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
-- TypeORM config uses `getConfig()` from postgres.ts for connection params
-- SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
-- `synchronize: true` for POC apps (no migrations needed)
-- Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
-- Entity files live in `entities/` subdirectory under each module
-- `@Index` for composite indexes goes at class level above `@Entity`
-- Cross-module entity imports use relative paths (e.g., `../../shift/entities/shift.entity`)
-- New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
-- New NestJS apps MUST have `.eslintrc.js` copied from tictactoe-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
-- Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
-- Controllers use `@Controller('api')` prefix; DTO files go in `dto/` subdirectory under each module
-- Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
-- Left join related entities (booking + professional) in shift queries to include nested data
-- For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
-- Booking controller uses `@Controller('api/shifts')` — sub-resources use the parent resource path prefix
-- NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
-- PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking rows with related entities
-- Booking endpoint should return HTTP 200 (not 201) — use `@HttpCode(200)` on the controller method
-- New Next.js apps MUST also be added to root `.prettierignore` (same as NestJS apps)
-- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui
-- Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
-- shadcn/ui components go in `src/components/ui/` — copy badge, button, card from tictactoe as baseline
-- No select.tsx in tictactoe — use native HTML select styled with `border-input bg-background px-3 py-2 text-sm rounded-md` to match theme
-- Backend GET /api/shifts does not support facilityId filter — filter client-side after fetching with status=all
+- Port assignments: 54321=realty-ai, 54322=tictactoe, 54323=shift-marketplace, 54324=midi-matching
+- App ports: 3003=shift-api, 3004=midi-api, UI ports: 2026=shift-ui, 2027=midi-ui
+- Always add NestJS apps to root .prettierignore (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
+- NestJS apps need a local .prettierrc.js (without the sort-imports plugin) so eslint's prettier/recommended can parse decorators
+- Symptom-to-specialty mapping is in src/shared/symptom-specialty-map.ts — reuse in both QuestionnaireService and ClinicianService
+- TypeORM DeepPartial<T> does not accept null — use undefined for optional nullable fields in repo.create()
+- Include tsconfig.build.json from the start for NestJS apps (nest start --watch requires it)
+- shift-api reference files are on ralph/shift-marketplace branch (not main), use `git show ralph/shift-marketplace:path` to view them
+- .env.local is NOT committed via .gitignore — need to create manually or in scaffolding step
+- Export interfaces used as return types from services — TS 5.9 requires named types in public methods to be exported (TS4053)
+- Use innerJoinAndSelect (not leftJoinAndSelect) when using pessimistic_write lock — PostgreSQL FOR UPDATE cannot be applied to nullable side of outer join
+- For pessimistic locking: DataSource.createQueryRunner() → connect → startTransaction → setLock('pessimistic_write') → commit/rollback → release in finally
+- Cancellation must null out slotId AND set slot relation to null — TypeORM's .save() uses relation objects to infer FK values, so nulling only the FK field is insufficient
+- Use leftJoinAndSelect for slot in list queries since cancelled appointments have slotId=null
 ---
 
-## 2026-03-01 - US-001
-- Scaffolded apps/shift-api/ with NestJS 10, TypeORM, PostgreSQL config
-- Files created:
-  - package.json (no langchain, redis, socket.io, postgraphile deps)
-  - tsconfig.json, nest-cli.json (identical to tictactoe-api)
-  - docker-compose.yml (postgres:16 on port 54323, db shift_marketplace)
-  - .env.example, .env.local
-  - src/config/postgres.ts, typeorm.ts, entities.ts
-  - src/main.ts (port 3003, CORS, global ValidationPipe)
-  - src/app.module.ts (TypeORM.forRoot, ShiftModule, BookingModule)
-  - src/modules/shift/shift.module.ts (placeholder)
-  - src/modules/booking/booking.module.ts (placeholder)
-- pnpm install succeeded, typecheck passes
+## 2026-03-04 - US-001
+- Scaffolded apps/midi-api/ with NestJS 10, TypeORM, PostgreSQL config
+- Files created: package.json, tsconfig.json, tsconfig.build.json, nest-cli.json, docker-compose.yml, .env.example, .env.local, .eslintrc.js, src/main.ts, src/app.module.ts, src/config/postgres.ts, src/config/typeorm.ts, src/config/entities.ts, 4 placeholder modules
+- Updated root .prettierignore to include apps/midi-api
 - **Learnings for future iterations:**
-  - Used synchronize: true (not false like tictactoe-api) since PRD says "TypeORM synchronize: true auto-creates tables on startup"
-  - .env.local is already in root .gitignore so it's safe to create per-app
-  - @nestjs/schematics peer dep warning for typescript 5.9 is expected (warns for ^3.4.5 || ^4.3.5) — doesn't affect builds
+  - shift-api source files exist on ralph/shift-marketplace branch, not on main — use git show to reference them
+  - .env.local was created as part of scaffolding (same values as .env.example for local dev)
+  - pnpm install auto-discovers the new workspace package via pnpm-workspace.yaml (apps/*)
 ---
 
-## 2026-03-01 - US-002
-- Created 4 TypeORM entities: Facility, Professional, Shift, Booking
-- Files created:
-  - src/modules/shift/entities/facility.entity.ts (OneToMany to Shift)
-  - src/modules/shift/entities/professional.entity.ts
-  - src/modules/shift/entities/shift.entity.ts (ManyToOne Facility, OneToOne Booking, composite indexes)
-  - src/modules/booking/entities/booking.entity.ts (OneToOne Shift, ManyToOne Professional, index on [professionalId, status])
-- Updated src/config/entities.ts to export [Facility, Professional, Shift, Booking]
-- Type aliases exported: FacilityType, Qualification, ShiftStatus, BookingStatus
-- Typecheck passes
+## 2026-03-04 - US-002
+- Created 8 TypeORM entities across 4 modules: Patient, Clinician, Specialty, ClinicianSpecialty, StateLicense, AvailabilitySlot, Appointment, HealthQuestionnaire
+- Updated src/config/entities.ts to register all 8 entities
+- Files created: patient.entity.ts, clinician.entity.ts, specialty.entity.ts, clinician-specialty.entity.ts, state-license.entity.ts, availability-slot.entity.ts, appointment.entity.ts, health-questionnaire.entity.ts
 - **Learnings for future iterations:**
-  - Entity files go in `entities/` subdirectory under each module (e.g., `modules/shift/entities/`)
-  - `@Index` decorator for composite indexes goes at the class level (above `@Entity`), not on individual properties
-  - Cross-module entity imports use relative paths (e.g., booking.entity imports from `../../shift/entities/shift.entity`)
-  - `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy to ensure correct FK column naming
-  - `bookedAt` uses `default: () => 'NOW()'` (function form) for DB-level default
+  - Follow shift-api entity patterns: @PrimaryGeneratedColumn('uuid'), explicit @JoinColumn({ name: 'snake_case_id' }), @Index at class level above @Entity
+  - ClinicianSpecialty uses composite PK with @PrimaryColumn on both clinicianId and specialtyId
+  - Use 'simple-array' TypeORM type for array columns (symptoms, careGoals, currentMedications) — stores as comma-separated string
+  - Bidirectional relations: OneToMany on parent side, ManyToOne with @JoinColumn on child side
+  - Unique constraints via @Unique decorator at class level
 ---
 
-## 2026-03-01 - US-003
-- Implemented Shift CRUD endpoints: create, list with filters, get by id, list facilities, list professionals
-- Files created:
-  - src/modules/shift/dto/create-shift.dto.ts (class-validator: IsUUID, IsIn, IsDateString, IsInt, Min)
-  - src/modules/shift/shift.service.ts (create, findAll, findOne, listFacilities, listProfessionals)
-  - src/modules/shift/shift.controller.ts (@Controller('api') with 5 endpoints)
-- Files modified:
-  - src/modules/shift/shift.module.ts (wired TypeOrmModule.forFeature, controller, service, exports)
-- Typecheck passes, pre-commit hooks pass
+## 2026-03-04 - US-003
+- Implemented questionnaire submission with symptom-to-specialty mapping
+- Files created: src/shared/symptom-specialty-map.ts, src/modules/questionnaire/dto/create-questionnaire.dto.ts, src/modules/questionnaire/questionnaire.service.ts, src/modules/questionnaire/questionnaire.controller.ts, .prettierrc.js
+- Files modified: src/modules/questionnaire/questionnaire.module.ts (added TypeOrmModule.forFeature, controller, service)
 - **Learnings for future iterations:**
-  - Use `@Controller('api')` prefix so routes are /api/shifts, /api/facilities, /api/professionals (all under one controller)
-  - Use createQueryBuilder for findAll() to support optional where clauses via .andWhere() pattern
-  - Left join booking + professional in shift queries so response includes booking info when shift is booked
-  - Service validates business rules (facility exists, endTime > startTime) and throws NestJS exceptions (NotFoundException, BadRequestException)
-  - The prettier/prettier eslint rule fails on decorator files due to root @trivago/prettier-plugin-sort-imports — this is pre-existing and not a blocker (same in tictactoe-api)
+  - eslint with plugin:prettier/recommended picks up root .prettierrc.js even when app is in .prettierignore — fix by creating local .prettierrc.js without the sort-imports plugin
+  - TypeORM Repository.create() has overloaded signatures; use an intermediate `DeepPartial<Entity>` variable to help TS resolve the correct overload
+  - DeepPartial<T> maps nullable columns to `T | undefined`, not `T | null` — pass undefined (or omit) instead of null
+  - Symptom-to-specialty mapping extracted to shared utility for reuse by ClinicianService in US-004
 ---
 
-## 2026-03-01 - US-004
-- Implemented booking endpoint with pessimistic locking for concurrent safety
-- Files created:
-  - src/modules/booking/dto/book-shift.dto.ts (class-validator: IsUUID for professionalId)
-  - src/modules/booking/booking.service.ts (bookShift with QueryRunner, pessimistic_write lock, transaction)
-  - src/modules/booking/booking.controller.ts (@Controller('api/shifts') with POST :id/book)
-- Files modified:
-  - src/modules/booking/booking.module.ts (wired TypeOrmModule.forFeature([Booking, Shift, Professional]), controller, service)
-- Typecheck passes, pre-commit hooks pass
+## 2026-03-04 - US-004
+- Implemented clinician matching endpoint with weighted scoring algorithm
+- Files created: src/modules/clinician/clinician.service.ts, src/modules/clinician/clinician.controller.ts
+- Files modified: src/modules/clinician/clinician.module.ts (added TypeOrmModule.forFeature, controller, service)
+- Endpoints: GET /api/clinicians/match, GET /api/clinicians/:id, GET /api/clinicians/:id/slots, GET /api/clinicians, GET /api/patients
+- Match score = 0.5*(specialty overlap) + 0.2*(availability) + 0.2*(rating) + 0.1*(experience), top 10 returned
 - **Learnings for future iterations:**
-  - Use `DataSource.createQueryRunner()` for transactions — inject `DataSource` directly (not repositories) for QueryRunner pattern
-  - Pessimistic lock: `createQueryBuilder('entity').setLock('pessimistic_write').where(...).getOne()`
-  - Use `queryRunner.manager.getRepository(Entity)` inside transactions to ensure operations run within the transaction
-  - Booking controller uses `@Controller('api/shifts')` (not `@Controller('api')`) since all routes are under /api/shifts/:id/book
-  - Error codes: 404 (not found), 409 (already booked), 400 (qualification mismatch) — match PRD exactly
-- Seed scripts: use TypeORM `upsert()` with unique `name` column for idempotent seeding (requires unique constraint on entity)
-- CLI scripts load .env.local via `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` at top of file
+  - Export interfaces used as return types from services — TS 5.9 strict mode requires named types to be exported when used in public methods of exported classes (TS4053)
+  - Use innerJoin (not leftJoin) for filtering joins (e.g., state licensure filter) — keeps unmatched clinicians out of results
+  - innerJoinAndSelect for data you need in the result (e.g., specialties) — loads the relation data
+  - max_available for score normalization uses Math.max(...results, 1) to avoid division by zero
+  - date comparison for license expiration: compare against now.toISOString().split('T')[0] for date-only comparison
+  - Also added listClinicians() for future clinician dashboard (US-006 notes mention needing GET /api/clinicians)
 ---
 
-## 2026-03-01 - US-005
-- Created seed script for 3 facilities and 5 professionals with upsert pattern
-- Files created:
-  - src/cli/seed.ts (TypeORM DataSource directly, upsert by name for idempotency)
-- Files modified:
-  - src/modules/shift/entities/facility.entity.ts (added unique: true to name column for upsert)
-  - src/modules/shift/entities/professional.entity.ts (added unique: true to name column for upsert)
-- Seed script already wired in package.json from US-001: `"seed": "ts-node --project tsconfig.json src/cli/seed.ts"`
-- Typecheck passes, pre-commit hooks pass
+## 2026-03-04 - US-005
+- Implemented appointment booking endpoint with pessimistic locking for concurrent-safe slot booking
+- Files created: src/modules/appointment/dto/book-appointment.dto.ts, src/modules/appointment/appointment.service.ts, src/modules/appointment/appointment.controller.ts
+- Files modified: src/modules/appointment/appointment.module.ts (added TypeOrmModule.forFeature, controller, service)
+- Endpoint: POST /api/appointments — books a slot with pessimistic_write lock, validates slot availability, clinician-slot ownership, patient existence, and state licensure
+- Concurrent booking: first request succeeds (201), second gets 409 conflict
 - **Learnings for future iterations:**
-  - TypeORM `upsert()` requires a unique constraint on the conflict column — added `unique: true` to entity `@Column` decorator
-  - CLI scripts create their own DataSource (not NestJS bootstrap) — load dotenv manually at top of file
-  - The `upsert(data, ['conflictColumn'])` second param is the column(s) to detect conflicts on
+  - Use innerJoinAndSelect (not leftJoinAndSelect) when applying pessimistic_write lock — PostgreSQL FOR UPDATE cannot be applied to the nullable side of an outer join
+  - Use intermediate `DeepPartial<Entity>` variable for queryRunner.manager.create() — same overload resolution issue as Repository.create()
+  - Cast DTO string fields to entity union types (e.g., `dto.visitType as VisitType`) before passing to create() — TS won't narrow string to union automatically
+  - Licensure check within transaction ensures consistency — queries state_license for verified, non-expired license in patient's state
 ---
 
-## 2026-03-01 - US-006
-- Verified full backend end-to-end via curl tests, found and fixed 3 issues
-- Issues fixed:
-  1. Missing `tsconfig.build.json` — `nest start --watch` requires it (not just tsconfig.json)
-  2. `leftJoinAndSelect` in booking service caused "FOR UPDATE cannot be applied to nullable side of outer join" — changed to `innerJoinAndSelect`
-  3. Booking endpoint returned 201 instead of 200 — added `@HttpCode(200)` decorator
-- Files created:
-  - tsconfig.build.json (extends tsconfig.json, excludes test/spec files)
-- Files modified:
-  - src/modules/booking/booking.service.ts (leftJoinAndSelect → innerJoinAndSelect for pessimistic lock query)
-  - src/modules/booking/booking.controller.ts (added @HttpCode(200) import and decorator)
-- All curl tests verified:
-  - GET /api/facilities → 3 facilities with UUIDs
-  - GET /api/professionals → 5 professionals with UUIDs
-  - POST /api/shifts → 201 with facility name
-  - GET /api/shifts → returns created shifts with facility and booking data
-  - POST /api/shifts/:id/book → 200 with booking and professional details
-  - Duplicate booking → 409 "Shift is already booked"
-  - Qualification mismatch → 400 with descriptive message
-  - Invalid POST → 400 with validation error array
-- Typecheck passes
+## 2026-03-04 - US-006
+- Implemented appointment listing and status management endpoints
+- Files created: src/modules/appointment/dto/update-appointment.dto.ts
+- Files modified: src/modules/appointment/appointment.service.ts (added listForPatient, listForClinician, updateStatus), src/modules/appointment/appointment.controller.ts (added GET and PATCH endpoints)
+- Endpoints: GET /api/appointments?patient_id=X or clinician_id=X, PATCH /api/appointments/:id
+- Cancel flow uses QueryRunner transaction: updates appointment status + cancelledAt/cancelledBy, and frees the slot (isBooked=false) for rebooking
+- Status transitions: only 'scheduled' appointments can be updated (→cancelled, →completed, →no_show). Invalid transitions return 400.
 - **Learnings for future iterations:**
-  - Always include `tsconfig.build.json` when scaffolding NestJS apps — it's required by `nest start --watch` and `nest build`
-  - When using `setLock('pessimistic_write')` with TypeORM, never use `leftJoinAndSelect` — PostgreSQL FOR UPDATE does not support nullable outer joins. Use `innerJoinAndSelect` for required relations.
-  - NestJS defaults POST to 201 — use `@HttpCode(200)` when the endpoint updates rather than creates
+  - Use ValidateIf decorator for conditional validation — e.g., cancelledBy is required only when status is 'cancelled'
+  - Consolidate duplicate TypeORM entity imports into a single import statement — eslint --fix may split them but then you get duplicate imports
+  - GET /api/clinicians (all active clinicians) was already added in US-004 — no changes needed to clinician controller for US-006
 ---
 
-## 2026-03-01 - US-007
-- Scaffolded apps/shift-ui/ with Next.js 14, Tailwind, shadcn/ui, types, and API client
-- Files created:
-  - package.json (no Apollo, GraphQL, Socket.io deps; dev server on port 2026)
-  - tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts
-  - .env.example, .env.local (NEXT_PUBLIC_API_URL=http://localhost:3003)
-  - src/app/globals.css (Tailwind base + shadcn theme variables)
-  - src/lib/utils.ts (cn() utility)
-  - src/components/ui/badge.tsx, button.tsx, card.tsx (copied from tictactoe)
-  - src/types/shift.ts (FacilityType, Qualification, ShiftStatus, Facility, Professional, BookingInfo, Shift interfaces)
-  - src/lib/api/shiftApi.ts (apiFetch wrapper + listFacilities, listProfessionals, createShift, listShifts, getShift, bookShift)
-  - src/app/layout.tsx (nav bar with links to /facility and /professional)
-  - src/app/page.tsx (landing page with links to both dashboards)
-  - src/app/facility/page.tsx (placeholder for US-008)
-  - src/app/professional/page.tsx (placeholder for US-009)
-- Files modified:
-  - .prettierignore (added apps/shift-ui to avoid root @trivago/prettier-plugin-sort-imports issues)
-- pnpm install succeeded, typecheck passes, `next dev` starts on port 2026
+## 2026-03-04 - US-007
+- Created src/cli/seed.ts with seed data for all 6 tables
+- Seed order: specialties → clinicians → clinician-specialty associations → state licenses → patients → availability slots
+- 6 specialties, 5 clinicians, state licenses (all verified, exp 2027), 4 patients, 8 slots/clinician over 7 days
+- Uses upsert pattern: findOneBy + create/update to avoid duplicates on re-run
+- Specialties use createQueryBuilder().insert().orUpdate() for true upsert
+- Files created: src/cli/seed.ts
 - **Learnings for future iterations:**
-  - Next.js apps also need to be in root `.prettierignore` to avoid root prettier plugin conflicts
-  - No select.tsx component exists in tictactoe — will need native HTML selects or a custom component for the dashboard dropdowns
-  - The API error handling pattern extracts `body.message` from JSON responses and attaches `status` code as a property on the Error object — useful for distinguishing 400/409/404 errors in the UI
-  - Placeholder pages for /facility and /professional routes ensure Next.js routing works immediately
+  - Clinician entity has no email/unique field — upsert by firstName+lastName combo
+  - TypeORM `orUpdate()` takes snake_case column names (as in DB), not camelCase entity property names
+  - `generatedMaps` from insert().returning('*') may be empty on conflict/update — always fall back to findOneBy
+  - `seed` script was already defined in package.json from US-001 scaffolding
+  - Availability slots use tomorrow through +7 days to ensure they're always in the future
 ---
 
-## 2026-03-01 - US-008
-- Implemented facility dashboard page with facility selector, shift creation form, and shift list
-- Files modified:
-  - src/app/facility/page.tsx (full 'use client' component replacing placeholder)
+## 2026-03-04 - US-008
+- Verified full backend via curl tests: all endpoints working end-to-end
+- Found and fixed critical bug: cancellation didn't release the unique slot_id constraint, blocking rebooking
+- Fix: made slotId nullable on Appointment entity, null out slotId + slot relation on cancel, use leftJoinAndSelect for slot in list queries
+- Files modified: src/modules/appointment/appointment.service.ts (cancel nulls slotId, list queries use leftJoin for slot, optional chaining on slot times), src/modules/appointment/entities/appointment.entity.ts (slotId nullable)
+- All acceptance criteria verified:
+  - GET /api/patients: 4 patients with state info
+  - POST /api/questionnaires: 201 with matchedSpecialties
+  - GET /api/clinicians/match: ranked clinicians filtered by state licensure
+  - GET /api/clinicians/:id/slots: unbooked time slots
+  - POST /api/appointments: 201 scheduled
+  - Double-booking: 409 conflict
+  - Unlicensed clinician: 400 with licensure error
+  - GET /api/appointments?patient_id=X: appointment list
+  - PATCH cancel: 200, slot freed, rebook succeeds
+  - Invalid POST: 400 with descriptive validation errors
+- **Learnings for future iterations:**
+  - OneToOne with unique constraint on FK means cancelled appointments block rebooking — must null the FK on cancel
+  - TypeORM .save() uses loaded relation objects to infer FK values — null both the FK field AND the relation property
+  - Use leftJoinAndSelect instead of innerJoinAndSelect for nullable FK relations in list queries
+  - Clean dist/ when restarting nest start --watch after entity changes — old compiled JS may persist
+---
+
+## 2026-03-04 - US-009
+- Scaffolded apps/midi-ui/ with Next.js 14, React 18, Tailwind CSS, shadcn/ui components
+- Files created: package.json, tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts, .env.example, .env.local, src/app/globals.css, src/lib/utils.ts, src/components/ui/button.tsx, src/components/ui/card.tsx, src/components/ui/badge.tsx, src/types/index.ts, src/lib/api/midiApi.ts, src/app/layout.tsx, src/app/page.tsx, src/app/questionnaire/page.tsx, src/app/clinician/page.tsx
+- Updated root .prettierignore to include apps/midi-ui
+- Types cover all domain entities: Patient, Clinician, Specialty, ClinicianSpecialty, StateLicense, AvailabilitySlot, Appointment, HealthQuestionnaire, MatchedClinician, plus type literals for Symptom, CareGoal, Severity, MenopauseStage, VisitType, AppointmentStatus, ClinicianCredential, CancelledBy
+- API client (midiApi.ts) wraps all backend endpoints: listPatients, submitQuestionnaire, matchClinicians, getClinicianDetail, getClinicianSlots, bookAppointment, listAppointments, cancelAppointment, listClinicians
+- **Learnings for future iterations:**
+  - shift-ui patterns work well as template — same package.json deps, tsconfig, tailwind config, shadcn components
+  - pnpm-workspace.yaml already includes apps/* glob so new apps are auto-discovered
+  - Frontend types should mirror backend entity shapes but use string for Date/timestamp fields (JSON serialization)
+  - QuestionnaireResponse extends HealthQuestionnaire with matchedSpecialties (computed, not stored)
+  - ApiError interface pattern: extend Error with status field, cast in apiFetch catch block
+---
+
+## 2026-03-04 - US-010
+- Implemented patient questionnaire and clinician matching page
+- Two-phase page: questionnaire form → matched clinician results
+- Files modified: src/app/questionnaire/page.tsx (full implementation replacing placeholder)
 - Features implemented:
-  - Dropdown to select a facility (populated from GET /api/facilities on mount)
-  - Form to post new shifts: qualification dropdown (CNA/LPN/RN), datetime-local inputs, pay rate in dollars (converted to cents)
-  - Shift list filtered by selected facility (fetched with status=all, filtered client-side by facilityId)
-  - Status badges: default variant for 'open', secondary variant for 'booked'
-  - Pay rate displayed as dollars (payRateCents / 100).toFixed(2)
-  - Professional name shown for booked shifts
+  - Patient selector dropdown (populated from GET /api/patients, shows name + state)
+  - Symptom checkboxes with human-readable labels (7 options)
+  - Severity radio buttons (mild/moderate/severe)
+  - Care goals checkboxes (4 options)
+  - Menopause stage dropdown (optional)
+  - Additional notes textarea (optional)
+  - Submit calls POST /api/questionnaires then GET /api/clinicians/match
+  - Matched clinician cards ordered by match score: name, credential, specialties (matching highlighted with default Badge variant), match score %, rating, years experience, available slot count, next available date
+  - "View Available Times" links to /book/[clinicianId]?patient_id=X&questionnaire_id=Y
   - Loading and error states handled
-- Typecheck passes, pre-commit hooks pass
+  - "New Questionnaire" button to start over
 - **Learnings for future iterations:**
-  - Backend GET /api/shifts does not support filtering by facilityId — must fetch with status=all and filter client-side
-  - Use native HTML select elements (no shadcn Select component available) — style with border-input bg-background classes to match theme
-  - datetime-local input type works well for shift start/end times — converts to ISO string via new Date(value).toISOString()
-  - Form state should reset after successful submission, and shift list should refetch
-  - useCallback for fetchShifts ensures it's a stable dependency for useEffect when selectedFacilityId changes
+  - CSS `has-[:checked]` pseudo-class works well for styling checkbox/radio containers without JS state
+  - Use native HTML selects per project convention (no shadcn Select)
+  - Badge variant="default" for matching specialties, variant="secondary" for non-matching — provides visual distinction
+  - Link wrapping Button component works for navigation from card footers
 ---
 
-## 2026-03-01 - US-009
-- Implemented professional dashboard page with professional selector, available shifts, booking, and my shifts sections
-- Files modified:
-  - src/app/professional/page.tsx (full 'use client' component replacing placeholder)
+## 2026-03-04 - US-011
+- Implemented appointment booking page at src/app/book/[clinicianId]/page.tsx
+- Three-phase page: loading → slot selection → booking confirmation
 - Features implemented:
-  - Dropdown to select a professional (populated from GET /api/professionals on mount, shows qualification)
-  - Available shifts section: filtered by selected professional's qualification via server query param
-  - Each available shift shows: facility name, qualification badge, time window, pay rate, Book button
-  - Book button calls POST /api/shifts/:id/book with selected professional's ID
-  - On success: refetches both available and booked shifts
-  - Inline error messages per shift for 409 (already booked) and 400 (qualification mismatch)
-  - My Shifts section: fetches booked shifts filtered client-side by professionalId
-  - Loading and error states handled
-- Typecheck passes, lint passes
+  - Reads patient_id and questionnaire_id from URL search params (useSearchParams)
+  - Clinician info card at top: name, credential, specialties (from clinicianSpecialties), bio, rating, years experience
+  - Available time slots fetched from GET /api/clinicians/:id/slots
+  - Slots grouped by date using Map, formatted with toLocaleDateString/toLocaleTimeString
+  - Each slot rendered as an outline Button with start–end time range
+  - Clicking a slot calls POST /api/appointments with all required fields
+  - On success: shows confirmation card with clinician name, date, time, status badge, visit type
+  - On 409: shows "This time slot is no longer available" error and auto-refreshes slot list
+  - On other errors: shows error message inline
+  - Loading and error states handled throughout
+  - Back to Questionnaire link on confirmation
+- Files created: src/app/book/[clinicianId]/page.tsx
 - **Learnings for future iterations:**
-  - Use per-shift error state (Record<string, string>) for inline error messages on individual shift rows
-  - Use per-shift booking-in-progress state (Record<string, boolean>) to disable individual Book buttons during requests
-  - Fetch available and booked shifts in parallel with Promise.all for better performance
-  - Import ApiError type from shiftApi.ts to properly type error handling in catch blocks
-  - Professional selector shows qualification in parentheses (e.g., "Alice Johnson (RN)") for better UX
+  - useParams() returns string for dynamic route segments — cast with `as string`
+  - Grouping slots by date: Map preserves insertion order, so pre-sorted slots stay sorted within groups
+  - eslint --fix resolves all prettier formatting — run it before commit to avoid lint issues
+  - ApiError type cast pattern: `const apiErr = err as ApiError; if (apiErr.status === 409)` for typed error handling
 ---
 
-## 2026-03-01 - US-010
-- End-to-end verification across both dashboards — all acceptance criteria verified
-- No code changes needed — all functionality works correctly
-- Verification steps completed:
-  1. Facility dashboard: selected Sunrise Nursing Home, posted CNA shift ($25/hr), confirmed listed as 'open'
-  2. Professional dashboard: selected Bob Smith (CNA), saw CNA shift in available list, booked it successfully (200)
-  3. Professional dashboard: shift moved to My Shifts section (filtered by professionalId)
-  4. Facility dashboard: refreshed shows shift as 'booked' with Bob Smith displayed
-  5. Professional dashboard: David Brown (CNA) — booked CNA shift NOT in available list (0 open CNA shifts)
-  6. Professional dashboard: Alice Johnson (RN) — CNA shift does NOT appear (qualification filter works)
-  7. Facility dashboard: posted RN shift at Metro General Hospital ($45/hr)
-  8. Professional dashboard as Alice Johnson (RN): saw the RN shift, booked it successfully
-  9. Both dashboards reflect correct state: CNA booked by Bob, RN booked by Alice
-  10. Extra verifications: duplicate booking → 409 "Shift is already booked", qualification mismatch → 400
-- Frontend pages all respond with 200: /, /facility, /professional
-- Typecheck passes on both shift-api and shift-ui
+## 2026-03-04 - US-012
+- Implemented clinician dashboard page at src/app/clinician/page.tsx
+- Updated midiApi.ts: added completeAppointment function, updated cancelAppointment to accept cancelledBy parameter
+- Features implemented:
+  - Clinician selector dropdown (populated from GET /api/clinicians, shows name + credential)
+  - Profile section: name, credential, specialties (primary highlighted with default Badge), licensed states, rating, years experience
+  - Appointments list from GET /api/appointments?clinician_id=X
+  - Status badges with color coding: blue=scheduled, green=completed, gray=cancelled, red=no_show (using className override on outline Badge variant)
+  - Cancel button on scheduled appointments: PATCH with status:cancelled, cancelledBy:clinician
+  - Complete button on scheduled appointments: PATCH with status:completed
+  - Loading and error states handled throughout
+  - Inline action loading state prevents double-clicks
+- Files modified: src/app/clinician/page.tsx (full implementation replacing placeholder), src/lib/api/midiApi.ts (added completeAppointment, updated cancelAppointment signature)
+- Files also modified: scripts/ralph/prd.json (US-012 passes: true)
 - **Learnings for future iterations:**
-  - Full E2E verification via curl is reliable for testing API + state transitions without browser tools
-  - The client-side filtering pattern (fetch all, filter by facilityId or professionalId) works well for POC scale
-  - All error codes are consistent: 409 for duplicate booking, 400 for qualification mismatch, 404 for missing entities
+  - Badge component doesn't have built-in color variants for status — use className override with outline variant for custom colors
+  - cancelAppointment needed cancelledBy parameter to support both patient and clinician cancellation
+  - Clinician detail endpoint (GET /api/clinicians/:id) returns clinicianSpecialties and stateLicenses when loaded via findOne
+  - GET /api/clinicians (listClinicians) also returns relations — can reuse for both dropdown and profile display
+---
+
+## 2026-03-04 - US-013
+- End-to-end verification across patient and clinician flows — all checks pass
+- Verified via curl tests (backend API) with both apps running (midi-api:3004, midi-ui:2027)
+- Test flow results:
+  - Lisa Thompson (CA): questionnaire (hot_flashes+weight_gain, moderate) → matched specialties hrt+weight_glp1
+  - Clinician matching: Dr. Sarah Chen ranked #1 (score 0.931, 100% specialty overlap, CA-licensed), Lopez #2, Rivera #3
+  - Park and Foster correctly excluded (not CA-licensed)
+  - Booked appointment for Lisa with Dr. Chen → 201 scheduled, visible on clinician dashboard
+  - Jennifer Moore (FL): questionnaire (hot_flashes+mood_changes, severe) → matched specialties hrt+mood
+  - FL matching: Dr. Chen correctly excluded (not FL-licensed), Dr. Lopez appears (FL-licensed)
+  - Dr. Foster absent from FL results — expected: her specialties (sleep, general_menopause) don't overlap with Jennifer's needs (hrt, mood)
+  - Booked appointment for Jennifer with Dr. Lopez → 201 scheduled, visible on clinician dashboard
+  - Cancelled Jennifer's appointment from clinician dashboard → status=cancelled, slot freed (isBooked=false)
+  - Patient and clinician views both reflect correct state for all appointments
+- No code changes required — all flows work correctly
+- Typecheck passes for both midi-api and midi-ui
+- **Learnings for future iterations:**
+  - The PRD AC for US-013 mentions Dr. Foster should appear for FL patients, but this depends on symptom/specialty overlap — Foster's specialties (sleep, general_menopause) may not overlap with the test symptoms
+  - Full E2E test sequence: seed → questionnaire → match → book → dashboard verify → cancel → verify slot freed
+  - Both apps must be running for full verification: midi-api on 3004, midi-ui on 2027, PostgreSQL on 54324
 ---

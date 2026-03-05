@@ -26,7 +26,7 @@
 				"Typecheck passes"
 			],
 			"priority": 1,
-			"passes": true,
+			"passes": false,
 			"notes": "Reference apps/shift-api/ for all patterns. Port 54324 for Postgres (54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace). Include tsconfig.build.json from the start (learned in shift-api US-006). Always add new NestJS apps to root .prettierignore."
 		},
 		{
@@ -47,7 +47,7 @@
 				"Typecheck passes"
 			],
 			"priority": 2,
-			"passes": true,
+			"passes": false,
 			"notes": "Use SnakeNamingStrategy (camelCase in TS -> snake_case in DB). For array columns, use 'simple-array' type (stores as comma-separated string) which is simpler than text[] with TypeORM. For ClinicianSpecialty composite PK, use @PrimaryColumn on both clinicianId and specialtyId. @JoinColumn({ name: 'snake_case_id' }) needed for FK columns. Entity files go in entities/ subdirectory under each module. @Index for composite indexes at class level above @Entity."
 		},
 		{
@@ -65,7 +65,7 @@
 				"Typecheck passes"
 			],
 			"priority": 3,
-			"passes": true,
+			"passes": false,
 			"notes": "The symptom-to-specialty mapping is a hardcoded dictionary in the service. brain_fog and hair_thinning map to 'general_menopause'. The matchedSpecialties field is returned in the response but NOT stored on the questionnaire entity — it's computed from the mapping. Use @Controller('api/questionnaires') prefix."
 		},
 		{
@@ -84,7 +84,7 @@
 				"Typecheck passes"
 			],
 			"priority": 4,
-			"passes": true,
+			"passes": false,
 			"notes": "The matching query involves joins across clinician, state_license, clinician_specialty, specialty, and availability_slot. Use QueryBuilder for the complex filtering. For max_available in the score calculation, use the maximum available_slot_count across all matched clinicians (or a fixed number like 20 to avoid division-by-zero). listPatients goes in ClinicianController under /api/patients for convenience — or create a separate PatientController if cleaner. The symptom-to-specialty mapping should be extracted to a shared utility so both QuestionnaireService and ClinicianService can use it."
 		},
 		{
@@ -101,7 +101,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": true,
+			"passes": false,
 			"notes": "Same pessimistic locking pattern as shift-api booking. Use DataSource.createQueryRunner(), setLock('pessimistic_write') on the AvailabilitySlot row. Use innerJoinAndSelect (not leftJoinAndSelect) when locking — PostgreSQL FOR UPDATE cannot be applied to nullable side of outer join. The licensure check queries state_license within the transaction to ensure consistency."
 		},
 		{
@@ -119,7 +119,7 @@
 				"Typecheck passes"
 			],
 			"priority": 6,
-			"passes": true,
+			"passes": false,
 			"notes": "The cancel flow must update both the appointment status AND the slot isBooked flag in a transaction. Use the same QueryRunner pattern. Status transitions: scheduled→cancelled, scheduled→completed, scheduled→no_show. Invalid transitions return 400. Also add GET /api/clinicians (all active clinicians, no filtering) to clinician.controller.ts so the clinician dashboard can populate a dropdown."
 		},
 		{
@@ -139,7 +139,7 @@
 				"Typecheck passes"
 			],
 			"priority": 7,
-			"passes": true,
+			"passes": false,
 			"notes": "Use TypeORM DataSource directly (not NestJS bootstrap). Load .env.local via dotenv at top of file. Seed order matters: specialties first, then clinicians, then clinician_specialty associations, then state_licenses, then patients, then availability_slots. For availability slots, create them for tomorrow through 7 days from now to ensure they're always in the future. Upsert specialties by name, clinicians by email or a generated unique field, patients by email."
 		},
 		{
@@ -162,7 +162,7 @@
 				"Invalid POST requests return 400 with descriptive validation errors"
 			],
 			"priority": 8,
-			"passes": true,
+			"passes": false,
 			"notes": "This is a verification story — fix any issues found during testing. Run docker:up, dev, and seed before curl tests. Use actual UUIDs from seed/query responses in subsequent curl commands. Test the full flow: questionnaire → match → book → cancel → rebook."
 		},
 		{
@@ -187,7 +187,7 @@
 				"Typecheck passes"
 			],
 			"priority": 9,
-			"passes": true,
+			"passes": false,
 			"notes": "Reference apps/shift-ui/ for all frontend patterns. API client pattern from shift-ui/src/lib/api/shiftApi.ts. NEXT_PUBLIC_API_URL defaults to http://localhost:3004. Use native HTML selects (no shadcn Select component). Add to root .prettierignore."
 		},
 		{
@@ -207,7 +207,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 10,
-			"passes": true,
+			"passes": false,
 			"notes": "Two-phase page: first shows questionnaire form, after submission shows matched clinician results. Use state to toggle between phases. Symptom/goal checkboxes use human-readable labels (e.g., 'Hot Flashes' not 'hot_flashes'). Pass patient_id and questionnaire_id as query params to the booking page."
 		},
 		{
@@ -229,7 +229,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 11,
-			"passes": true,
+			"passes": false,
 			"notes": "Use useSearchParams() to read patient_id and questionnaire_id from query params. Group slots by date using a reduce or Map. Format dates/times using Intl.DateTimeFormat or toLocaleDateString/toLocaleTimeString. After booking, show a simple confirmation card — no need for a separate page."
 		},
 		{
@@ -248,7 +248,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 12,
-			"passes": true,
+			"passes": false,
 			"notes": "Badge colors for appointment status: use variant classes — blue for scheduled, green for completed, gray for cancelled, red for no_show. Only show Cancel/Complete buttons for appointments with status 'scheduled'. After cancelling, the freed slot should appear if clinician views their slots elsewhere."
 		},
 		{
@@ -269,7 +269,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 13,
-			"passes": true,
+			"passes": false,
 			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: midi-api on 3004, midi-ui on 2027. Database must be seeded. Key test: FL patient should NOT see CA-only licensed clinicians — this verifies the state licensure filtering works."
 		}
 	]

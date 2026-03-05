@@ -1,0 +1,236 @@
+# Ralph Progress Log
+Started: Sun Mar  1 18:47:22 PST 2026
+
+## Codebase Patterns
+- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace
+- NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
+- TypeORM config uses `getConfig()` from postgres.ts for connection params
+- SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
+- `synchronize: true` for POC apps (no migrations needed)
+- Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
+- Entity files live in `entities/` subdirectory under each module
+- `@Index` for composite indexes goes at class level above `@Entity`
+- Cross-module entity imports use relative paths (e.g., `../../shift/entities/shift.entity`)
+- New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
+- New NestJS apps MUST have `.eslintrc.js` copied from tictactoe-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
+- Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
+- Controllers use `@Controller('api')` prefix; DTO files go in `dto/` subdirectory under each module
+- Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
+- Left join related entities (booking + professional) in shift queries to include nested data
+- For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
+- Booking controller uses `@Controller('api/shifts')` — sub-resources use the parent resource path prefix
+- NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
+- PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking rows with related entities
+- Booking endpoint should return HTTP 200 (not 201) — use `@HttpCode(200)` on the controller method
+- New Next.js apps MUST also be added to root `.prettierignore` (same as NestJS apps)
+- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui
+- Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
+- shadcn/ui components go in `src/components/ui/` — copy badge, button, card from tictactoe as baseline
+- No select.tsx in tictactoe — use native HTML select styled with `border-input bg-background px-3 py-2 text-sm rounded-md` to match theme
+- Backend GET /api/shifts does not support facilityId filter — filter client-side after fetching with status=all
+---
+
+## 2026-03-01 - US-001
+- Scaffolded apps/shift-api/ with NestJS 10, TypeORM, PostgreSQL config
+- Files created:
+  - package.json (no langchain, redis, socket.io, postgraphile deps)
+  - tsconfig.json, nest-cli.json (identical to tictactoe-api)
+  - docker-compose.yml (postgres:16 on port 54323, db shift_marketplace)
+  - .env.example, .env.local
+  - src/config/postgres.ts, typeorm.ts, entities.ts
+  - src/main.ts (port 3003, CORS, global ValidationPipe)
+  - src/app.module.ts (TypeORM.forRoot, ShiftModule, BookingModule)
+  - src/modules/shift/shift.module.ts (placeholder)
+  - src/modules/booking/booking.module.ts (placeholder)
+- pnpm install succeeded, typecheck passes
+- **Learnings for future iterations:**
+  - Used synchronize: true (not false like tictactoe-api) since PRD says "TypeORM synchronize: true auto-creates tables on startup"
+  - .env.local is already in root .gitignore so it's safe to create per-app
+  - @nestjs/schematics peer dep warning for typescript 5.9 is expected (warns for ^3.4.5 || ^4.3.5) — doesn't affect builds
+---
+
+## 2026-03-01 - US-002
+- Created 4 TypeORM entities: Facility, Professional, Shift, Booking
+- Files created:
+  - src/modules/shift/entities/facility.entity.ts (OneToMany to Shift)
+  - src/modules/shift/entities/professional.entity.ts
+  - src/modules/shift/entities/shift.entity.ts (ManyToOne Facility, OneToOne Booking, composite indexes)
+  - src/modules/booking/entities/booking.entity.ts (OneToOne Shift, ManyToOne Professional, index on [professionalId, status])
+- Updated src/config/entities.ts to export [Facility, Professional, Shift, Booking]
+- Type aliases exported: FacilityType, Qualification, ShiftStatus, BookingStatus
+- Typecheck passes
+- **Learnings for future iterations:**
+  - Entity files go in `entities/` subdirectory under each module (e.g., `modules/shift/entities/`)
+  - `@Index` decorator for composite indexes goes at the class level (above `@Entity`), not on individual properties
+  - Cross-module entity imports use relative paths (e.g., booking.entity imports from `../../shift/entities/shift.entity`)
+  - `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy to ensure correct FK column naming
+  - `bookedAt` uses `default: () => 'NOW()'` (function form) for DB-level default
+---
+
+## 2026-03-01 - US-003
+- Implemented Shift CRUD endpoints: create, list with filters, get by id, list facilities, list professionals
+- Files created:
+  - src/modules/shift/dto/create-shift.dto.ts (class-validator: IsUUID, IsIn, IsDateString, IsInt, Min)
+  - src/modules/shift/shift.service.ts (create, findAll, findOne, listFacilities, listProfessionals)
+  - src/modules/shift/shift.controller.ts (@Controller('api') with 5 endpoints)
+- Files modified:
+  - src/modules/shift/shift.module.ts (wired TypeOrmModule.forFeature, controller, service, exports)
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Use `@Controller('api')` prefix so routes are /api/shifts, /api/facilities, /api/professionals (all under one controller)
+  - Use createQueryBuilder for findAll() to support optional where clauses via .andWhere() pattern
+  - Left join booking + professional in shift queries so response includes booking info when shift is booked
+  - Service validates business rules (facility exists, endTime > startTime) and throws NestJS exceptions (NotFoundException, BadRequestException)
+  - The prettier/prettier eslint rule fails on decorator files due to root @trivago/prettier-plugin-sort-imports — this is pre-existing and not a blocker (same in tictactoe-api)
+---
+
+## 2026-03-01 - US-004
+- Implemented booking endpoint with pessimistic locking for concurrent safety
+- Files created:
+  - src/modules/booking/dto/book-shift.dto.ts (class-validator: IsUUID for professionalId)
+  - src/modules/booking/booking.service.ts (bookShift with QueryRunner, pessimistic_write lock, transaction)
+  - src/modules/booking/booking.controller.ts (@Controller('api/shifts') with POST :id/book)
+- Files modified:
+  - src/modules/booking/booking.module.ts (wired TypeOrmModule.forFeature([Booking, Shift, Professional]), controller, service)
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Use `DataSource.createQueryRunner()` for transactions — inject `DataSource` directly (not repositories) for QueryRunner pattern
+  - Pessimistic lock: `createQueryBuilder('entity').setLock('pessimistic_write').where(...).getOne()`
+  - Use `queryRunner.manager.getRepository(Entity)` inside transactions to ensure operations run within the transaction
+  - Booking controller uses `@Controller('api/shifts')` (not `@Controller('api')`) since all routes are under /api/shifts/:id/book
+  - Error codes: 404 (not found), 409 (already booked), 400 (qualification mismatch) — match PRD exactly
+- Seed scripts: use TypeORM `upsert()` with unique `name` column for idempotent seeding (requires unique constraint on entity)
+- CLI scripts load .env.local via `dotenv.config({ path: path.join(__dirname, '../../.env.local') })` at top of file
+---
+
+## 2026-03-01 - US-005
+- Created seed script for 3 facilities and 5 professionals with upsert pattern
+- Files created:
+  - src/cli/seed.ts (TypeORM DataSource directly, upsert by name for idempotency)
+- Files modified:
+  - src/modules/shift/entities/facility.entity.ts (added unique: true to name column for upsert)
+  - src/modules/shift/entities/professional.entity.ts (added unique: true to name column for upsert)
+- Seed script already wired in package.json from US-001: `"seed": "ts-node --project tsconfig.json src/cli/seed.ts"`
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - TypeORM `upsert()` requires a unique constraint on the conflict column — added `unique: true` to entity `@Column` decorator
+  - CLI scripts create their own DataSource (not NestJS bootstrap) — load dotenv manually at top of file
+  - The `upsert(data, ['conflictColumn'])` second param is the column(s) to detect conflicts on
+---
+
+## 2026-03-01 - US-006
+- Verified full backend end-to-end via curl tests, found and fixed 3 issues
+- Issues fixed:
+  1. Missing `tsconfig.build.json` — `nest start --watch` requires it (not just tsconfig.json)
+  2. `leftJoinAndSelect` in booking service caused "FOR UPDATE cannot be applied to nullable side of outer join" — changed to `innerJoinAndSelect`
+  3. Booking endpoint returned 201 instead of 200 — added `@HttpCode(200)` decorator
+- Files created:
+  - tsconfig.build.json (extends tsconfig.json, excludes test/spec files)
+- Files modified:
+  - src/modules/booking/booking.service.ts (leftJoinAndSelect → innerJoinAndSelect for pessimistic lock query)
+  - src/modules/booking/booking.controller.ts (added @HttpCode(200) import and decorator)
+- All curl tests verified:
+  - GET /api/facilities → 3 facilities with UUIDs
+  - GET /api/professionals → 5 professionals with UUIDs
+  - POST /api/shifts → 201 with facility name
+  - GET /api/shifts → returns created shifts with facility and booking data
+  - POST /api/shifts/:id/book → 200 with booking and professional details
+  - Duplicate booking → 409 "Shift is already booked"
+  - Qualification mismatch → 400 with descriptive message
+  - Invalid POST → 400 with validation error array
+- Typecheck passes
+- **Learnings for future iterations:**
+  - Always include `tsconfig.build.json` when scaffolding NestJS apps — it's required by `nest start --watch` and `nest build`
+  - When using `setLock('pessimistic_write')` with TypeORM, never use `leftJoinAndSelect` — PostgreSQL FOR UPDATE does not support nullable outer joins. Use `innerJoinAndSelect` for required relations.
+  - NestJS defaults POST to 201 — use `@HttpCode(200)` when the endpoint updates rather than creates
+---
+
+## 2026-03-01 - US-007
+- Scaffolded apps/shift-ui/ with Next.js 14, Tailwind, shadcn/ui, types, and API client
+- Files created:
+  - package.json (no Apollo, GraphQL, Socket.io deps; dev server on port 2026)
+  - tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts
+  - .env.example, .env.local (NEXT_PUBLIC_API_URL=http://localhost:3003)
+  - src/app/globals.css (Tailwind base + shadcn theme variables)
+  - src/lib/utils.ts (cn() utility)
+  - src/components/ui/badge.tsx, button.tsx, card.tsx (copied from tictactoe)
+  - src/types/shift.ts (FacilityType, Qualification, ShiftStatus, Facility, Professional, BookingInfo, Shift interfaces)
+  - src/lib/api/shiftApi.ts (apiFetch wrapper + listFacilities, listProfessionals, createShift, listShifts, getShift, bookShift)
+  - src/app/layout.tsx (nav bar with links to /facility and /professional)
+  - src/app/page.tsx (landing page with links to both dashboards)
+  - src/app/facility/page.tsx (placeholder for US-008)
+  - src/app/professional/page.tsx (placeholder for US-009)
+- Files modified:
+  - .prettierignore (added apps/shift-ui to avoid root @trivago/prettier-plugin-sort-imports issues)
+- pnpm install succeeded, typecheck passes, `next dev` starts on port 2026
+- **Learnings for future iterations:**
+  - Next.js apps also need to be in root `.prettierignore` to avoid root prettier plugin conflicts
+  - No select.tsx component exists in tictactoe — will need native HTML selects or a custom component for the dashboard dropdowns
+  - The API error handling pattern extracts `body.message` from JSON responses and attaches `status` code as a property on the Error object — useful for distinguishing 400/409/404 errors in the UI
+  - Placeholder pages for /facility and /professional routes ensure Next.js routing works immediately
+---
+
+## 2026-03-01 - US-008
+- Implemented facility dashboard page with facility selector, shift creation form, and shift list
+- Files modified:
+  - src/app/facility/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a facility (populated from GET /api/facilities on mount)
+  - Form to post new shifts: qualification dropdown (CNA/LPN/RN), datetime-local inputs, pay rate in dollars (converted to cents)
+  - Shift list filtered by selected facility (fetched with status=all, filtered client-side by facilityId)
+  - Status badges: default variant for 'open', secondary variant for 'booked'
+  - Pay rate displayed as dollars (payRateCents / 100).toFixed(2)
+  - Professional name shown for booked shifts
+  - Loading and error states handled
+- Typecheck passes, pre-commit hooks pass
+- **Learnings for future iterations:**
+  - Backend GET /api/shifts does not support filtering by facilityId — must fetch with status=all and filter client-side
+  - Use native HTML select elements (no shadcn Select component available) — style with border-input bg-background classes to match theme
+  - datetime-local input type works well for shift start/end times — converts to ISO string via new Date(value).toISOString()
+  - Form state should reset after successful submission, and shift list should refetch
+  - useCallback for fetchShifts ensures it's a stable dependency for useEffect when selectedFacilityId changes
+---
+
+## 2026-03-01 - US-009
+- Implemented professional dashboard page with professional selector, available shifts, booking, and my shifts sections
+- Files modified:
+  - src/app/professional/page.tsx (full 'use client' component replacing placeholder)
+- Features implemented:
+  - Dropdown to select a professional (populated from GET /api/professionals on mount, shows qualification)
+  - Available shifts section: filtered by selected professional's qualification via server query param
+  - Each available shift shows: facility name, qualification badge, time window, pay rate, Book button
+  - Book button calls POST /api/shifts/:id/book with selected professional's ID
+  - On success: refetches both available and booked shifts
+  - Inline error messages per shift for 409 (already booked) and 400 (qualification mismatch)
+  - My Shifts section: fetches booked shifts filtered client-side by professionalId
+  - Loading and error states handled
+- Typecheck passes, lint passes
+- **Learnings for future iterations:**
+  - Use per-shift error state (Record<string, string>) for inline error messages on individual shift rows
+  - Use per-shift booking-in-progress state (Record<string, boolean>) to disable individual Book buttons during requests
+  - Fetch available and booked shifts in parallel with Promise.all for better performance
+  - Import ApiError type from shiftApi.ts to properly type error handling in catch blocks
+  - Professional selector shows qualification in parentheses (e.g., "Alice Johnson (RN)") for better UX
+---
+
+## 2026-03-01 - US-010
+- End-to-end verification across both dashboards — all acceptance criteria verified
+- No code changes needed — all functionality works correctly
+- Verification steps completed:
+  1. Facility dashboard: selected Sunrise Nursing Home, posted CNA shift ($25/hr), confirmed listed as 'open'
+  2. Professional dashboard: selected Bob Smith (CNA), saw CNA shift in available list, booked it successfully (200)
+  3. Professional dashboard: shift moved to My Shifts section (filtered by professionalId)
+  4. Facility dashboard: refreshed shows shift as 'booked' with Bob Smith displayed
+  5. Professional dashboard: David Brown (CNA) — booked CNA shift NOT in available list (0 open CNA shifts)
+  6. Professional dashboard: Alice Johnson (RN) — CNA shift does NOT appear (qualification filter works)
+  7. Facility dashboard: posted RN shift at Metro General Hospital ($45/hr)
+  8. Professional dashboard as Alice Johnson (RN): saw the RN shift, booked it successfully
+  9. Both dashboards reflect correct state: CNA booked by Bob, RN booked by Alice
+  10. Extra verifications: duplicate booking → 409 "Shift is already booked", qualification mismatch → 400
+- Frontend pages all respond with 200: /, /facility, /professional
+- Typecheck passes on both shift-api and shift-ui
+- **Learnings for future iterations:**
+  - Full E2E verification via curl is reliable for testing API + state transitions without browser tools
+  - The client-side filtering pattern (fetch all, filter by facilityId or professionalId) works well for POC scale
+  - All error codes are consistent: 409 for duplicate booking, 400 for qualification mismatch, 404 for missing entities
+---
