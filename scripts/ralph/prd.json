@@ -207,7 +207,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 10,
-			"passes": false,
+			"passes": true,
 			"notes": "Two-phase page: first shows questionnaire form, after submission shows matched clinician results. Use state to toggle between phases. Symptom/goal checkboxes use human-readable labels (e.g., 'Hot Flashes' not 'hot_flashes'). Pass patient_id and questionnaire_id as query params to the booking page."
 		},
 		{
