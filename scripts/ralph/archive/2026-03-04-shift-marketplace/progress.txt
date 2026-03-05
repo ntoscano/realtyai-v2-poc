@@ -1,0 +1,31 @@
+# Ralph Progress Log
+Started:
+
+## Codebase Patterns
+- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace, 54324 = midi-matching
+- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui, 2027 = midi-ui
+- NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
+- TypeORM config uses `getConfig()` from postgres.ts for connection params
+- SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)
+- `synchronize: true` for POC apps (no migrations needed)
+- Global ValidationPipe with `whitelist: true` and `forbidNonWhitelisted: true`
+- Entity files live in `entities/` subdirectory under each module
+- `@Index` for composite indexes goes at class level above `@Entity`
+- Cross-module entity imports use relative paths (e.g., `../../clinician/entities/clinician.entity`)
+- New NestJS apps MUST be added to root `.prettierignore` (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
+- New Next.js apps MUST also be added to root `.prettierignore`
+- New NestJS apps MUST have `.eslintrc.js` copied from shift-api (with `root: true`, `@typescript-eslint/parser`, decorator support)
+- Pre-commit hooks: husky + lint-staged runs eslint + prettier from repo root on staged files
+- Controllers use `@Controller('api')` or `@Controller('api/resource')` prefix
+- DTO files go in `dto/` subdirectory under each module
+- Use createQueryBuilder with `.andWhere()` for optional filter patterns in findAll methods
+- For pessimistic locking: inject `DataSource`, use `createQueryRunner()`, `setLock('pessimistic_write')`, commit/rollback/release pattern
+- PostgreSQL `FOR UPDATE` cannot be applied to nullable side of outer join — use `innerJoinAndSelect` instead of `leftJoinAndSelect` when locking
+- NestJS apps MUST have `tsconfig.build.json` (extends tsconfig.json, excludes test/spec) — `nest start --watch` requires it
+- Frontend API client pattern: `apiFetch<T>()` wrapper with typed error handling, API_URL from `NEXT_PUBLIC_API_URL` env var
+- shadcn/ui components go in `src/components/ui/` — copy badge, button, card from shift-ui as baseline
+- No select.tsx in any app — use native HTML select styled with `border-input bg-background px-3 py-2 text-sm rounded-md`
+- CLI seed scripts: use TypeORM DataSource directly (not NestJS bootstrap), load .env.local via dotenv, upsert by unique column for idempotency
+- TypeORM `upsert()` requires a unique constraint on the conflict column — add `unique: true` to entity `@Column` decorator
+- `@JoinColumn({ name: 'snake_case_id' })` needed even with SnakeNamingStrategy for correct FK column naming
+---
