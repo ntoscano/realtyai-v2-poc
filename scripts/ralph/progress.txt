@@ -14,6 +14,8 @@ Started: Wed Mar  4 16:37:23 PST 2026
 - Export interfaces used as return types from services — TS 5.9 requires named types in public methods to be exported (TS4053)
 - Use innerJoinAndSelect (not leftJoinAndSelect) when using pessimistic_write lock — PostgreSQL FOR UPDATE cannot be applied to nullable side of outer join
 - For pessimistic locking: DataSource.createQueryRunner() → connect → startTransaction → setLock('pessimistic_write') → commit/rollback → release in finally
+- Cancellation must null out slotId AND set slot relation to null — TypeORM's .save() uses relation objects to infer FK values, so nulling only the FK field is insufficient
+- Use leftJoinAndSelect for slot in list queries since cancelled appointments have slotId=null
 ---
 
 ## 2026-03-04 - US-001
@@ -88,4 +90,42 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Use ValidateIf decorator for conditional validation — e.g., cancelledBy is required only when status is 'cancelled'
   - Consolidate duplicate TypeORM entity imports into a single import statement — eslint --fix may split them but then you get duplicate imports
   - GET /api/clinicians (all active clinicians) was already added in US-004 — no changes needed to clinician controller for US-006
+---
+
+## 2026-03-04 - US-007
+- Created src/cli/seed.ts with seed data for all 6 tables
+- Seed order: specialties → clinicians → clinician-specialty associations → state licenses → patients → availability slots
+- 6 specialties, 5 clinicians, state licenses (all verified, exp 2027), 4 patients, 8 slots/clinician over 7 days
+- Uses upsert pattern: findOneBy + create/update to avoid duplicates on re-run
+- Specialties use createQueryBuilder().insert().orUpdate() for true upsert
+- Files created: src/cli/seed.ts
+- **Learnings for future iterations:**
+  - Clinician entity has no email/unique field — upsert by firstName+lastName combo
+  - TypeORM `orUpdate()` takes snake_case column names (as in DB), not camelCase entity property names
+  - `generatedMaps` from insert().returning('*') may be empty on conflict/update — always fall back to findOneBy
+  - `seed` script was already defined in package.json from US-001 scaffolding
+  - Availability slots use tomorrow through +7 days to ensure they're always in the future
+---
+
+## 2026-03-04 - US-008
+- Verified full backend via curl tests: all endpoints working end-to-end
+- Found and fixed critical bug: cancellation didn't release the unique slot_id constraint, blocking rebooking
+- Fix: made slotId nullable on Appointment entity, null out slotId + slot relation on cancel, use leftJoinAndSelect for slot in list queries
+- Files modified: src/modules/appointment/appointment.service.ts (cancel nulls slotId, list queries use leftJoin for slot, optional chaining on slot times), src/modules/appointment/entities/appointment.entity.ts (slotId nullable)
+- All acceptance criteria verified:
+  - GET /api/patients: 4 patients with state info
+  - POST /api/questionnaires: 201 with matchedSpecialties
+  - GET /api/clinicians/match: ranked clinicians filtered by state licensure
+  - GET /api/clinicians/:id/slots: unbooked time slots
+  - POST /api/appointments: 201 scheduled
+  - Double-booking: 409 conflict
+  - Unlicensed clinician: 400 with licensure error
+  - GET /api/appointments?patient_id=X: appointment list
+  - PATCH cancel: 200, slot freed, rebook succeeds
+  - Invalid POST: 400 with descriptive validation errors
+- **Learnings for future iterations:**
+  - OneToOne with unique constraint on FK means cancelled appointments block rebooking — must null the FK on cancel
+  - TypeORM .save() uses loaded relation objects to infer FK values — null both the FK field AND the relation property
+  - Use leftJoinAndSelect instead of innerJoinAndSelect for nullable FK relations in list queries
+  - Clean dist/ when restarting nest start --watch after entity changes — old compiled JS may persist
 ---

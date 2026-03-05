@@ -34,8 +34,8 @@ export class Appointment {
 	@Column({ type: 'uuid' })
 	clinicianId: string;
 
-	@Column({ type: 'uuid', unique: true })
-	slotId: string;
+	@Column({ type: 'uuid', unique: true, nullable: true })
+	slotId: string | null;
 
 	@Column({ type: 'varchar', length: 20, default: 'scheduled' })
 	status: AppointmentStatus;

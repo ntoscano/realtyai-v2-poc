@@ -139,7 +139,7 @@
 				"Typecheck passes"
 			],
 			"priority": 7,
-			"passes": false,
+			"passes": true,
 			"notes": "Use TypeORM DataSource directly (not NestJS bootstrap). Load .env.local via dotenv at top of file. Seed order matters: specialties first, then clinicians, then clinician_specialty associations, then state_licenses, then patients, then availability_slots. For availability slots, create them for tomorrow through 7 days from now to ensure they're always in the future. Upsert specialties by name, clinicians by email or a generated unique field, patients by email."
 		},
 		{
@@ -162,7 +162,7 @@
 				"Invalid POST requests return 400 with descriptive validation errors"
 			],
 			"priority": 8,
-			"passes": false,
+			"passes": true,
 			"notes": "This is a verification story — fix any issues found during testing. Run docker:up, dev, and seed before curl tests. Use actual UUIDs from seed/query responses in subsequent curl commands. Test the full flow: questionnaire → match → book → cancel → rebook."
 		},
 		{

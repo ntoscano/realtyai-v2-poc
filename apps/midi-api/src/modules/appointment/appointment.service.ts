@@ -167,7 +167,7 @@ export class AppointmentService {
 			.createQueryBuilder('appt')
 			.innerJoinAndSelect('appt.clinician', 'clinician')
 			.innerJoinAndSelect('appt.patient', 'patient')
-			.innerJoinAndSelect('appt.slot', 'slot')
+			.leftJoinAndSelect('appt.slot', 'slot')
 			.where('appt.patientId = :patientId', { patientId })
 			.orderBy('slot.startTime', 'DESC')
 			.getMany();
@@ -178,8 +178,8 @@ export class AppointmentService {
 			patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
 			clinicianId: appt.clinicianId,
 			clinicianName: `${appt.clinician.firstName} ${appt.clinician.lastName}, ${appt.clinician.credential}`,
-			startTime: appt.slot.startTime,
-			endTime: appt.slot.endTime,
+			startTime: appt.slot?.startTime,
+			endTime: appt.slot?.endTime,
 			status: appt.status,
 			visitType: appt.visitType,
 			createdAt: appt.createdAt,
@@ -191,7 +191,7 @@ export class AppointmentService {
 			.createQueryBuilder('appt')
 			.innerJoinAndSelect('appt.clinician', 'clinician')
 			.innerJoinAndSelect('appt.patient', 'patient')
-			.innerJoinAndSelect('appt.slot', 'slot')
+			.leftJoinAndSelect('appt.slot', 'slot')
 			.where('appt.clinicianId = :clinicianId', { clinicianId })
 			.orderBy('slot.startTime', 'DESC')
 			.getMany();
@@ -202,8 +202,8 @@ export class AppointmentService {
 			patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
 			clinicianId: appt.clinicianId,
 			clinicianName: `${appt.clinician.firstName} ${appt.clinician.lastName}, ${appt.clinician.credential}`,
-			startTime: appt.slot.startTime,
-			endTime: appt.slot.endTime,
+			startTime: appt.slot?.startTime,
+			endTime: appt.slot?.endTime,
 			status: appt.status,
 			visitType: appt.visitType,
 			createdAt: appt.createdAt,
@@ -243,6 +243,10 @@ export class AppointmentService {
 
 			appointment.status = newStatus;
 
+			// Capture slot times before potentially nulling the reference
+			const slotStartTime = appointment.slot.startTime;
+			const slotEndTime = appointment.slot.endTime;
+
 			if (newStatus === 'cancelled') {
 				appointment.cancelledAt = new Date();
 				appointment.cancelledBy = dto.cancelledBy as CancelledBy;
@@ -251,6 +255,10 @@ export class AppointmentService {
 				const slot = appointment.slot;
 				slot.isBooked = false;
 				await queryRunner.manager.save(AvailabilitySlot, slot);
+
+				// Release the unique slot reference so the slot can be rebooked
+				appointment.slotId = null;
+				appointment.slot = null as any;
 			}
 
 			await queryRunner.manager.save(Appointment, appointment);
@@ -262,8 +270,8 @@ export class AppointmentService {
 				patientName: `${appointment.patient.firstName} ${appointment.patient.lastName}`,
 				clinicianId: appointment.clinicianId,
 				clinicianName: `${appointment.clinician.firstName} ${appointment.clinician.lastName}, ${appointment.clinician.credential}`,
-				startTime: appointment.slot.startTime,
-				endTime: appointment.slot.endTime,
+				startTime: slotStartTime,
+				endTime: slotEndTime,
 				status: appointment.status,
 				visitType: appointment.visitType,
 				createdAt: appointment.createdAt,
