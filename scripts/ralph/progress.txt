@@ -11,6 +11,9 @@ Started: Wed Mar  4 16:37:23 PST 2026
 - Include tsconfig.build.json from the start for NestJS apps (nest start --watch requires it)
 - shift-api reference files are on ralph/shift-marketplace branch (not main), use `git show ralph/shift-marketplace:path` to view them
 - .env.local is NOT committed via .gitignore — need to create manually or in scaffolding step
+- Export interfaces used as return types from services — TS 5.9 requires named types in public methods to be exported (TS4053)
+- Use innerJoinAndSelect (not leftJoinAndSelect) when using pessimistic_write lock — PostgreSQL FOR UPDATE cannot be applied to nullable side of outer join
+- For pessimistic locking: DataSource.createQueryRunner() → connect → startTransaction → setLock('pessimistic_write') → commit/rollback → release in finally
 ---
 
 ## 2026-03-04 - US-001
@@ -44,4 +47,32 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - TypeORM Repository.create() has overloaded signatures; use an intermediate `DeepPartial<Entity>` variable to help TS resolve the correct overload
   - DeepPartial<T> maps nullable columns to `T | undefined`, not `T | null` — pass undefined (or omit) instead of null
   - Symptom-to-specialty mapping extracted to shared utility for reuse by ClinicianService in US-004
+---
+
+## 2026-03-04 - US-004
+- Implemented clinician matching endpoint with weighted scoring algorithm
+- Files created: src/modules/clinician/clinician.service.ts, src/modules/clinician/clinician.controller.ts
+- Files modified: src/modules/clinician/clinician.module.ts (added TypeOrmModule.forFeature, controller, service)
+- Endpoints: GET /api/clinicians/match, GET /api/clinicians/:id, GET /api/clinicians/:id/slots, GET /api/clinicians, GET /api/patients
+- Match score = 0.5*(specialty overlap) + 0.2*(availability) + 0.2*(rating) + 0.1*(experience), top 10 returned
+- **Learnings for future iterations:**
+  - Export interfaces used as return types from services — TS 5.9 strict mode requires named types to be exported when used in public methods of exported classes (TS4053)
+  - Use innerJoin (not leftJoin) for filtering joins (e.g., state licensure filter) — keeps unmatched clinicians out of results
+  - innerJoinAndSelect for data you need in the result (e.g., specialties) — loads the relation data
+  - max_available for score normalization uses Math.max(...results, 1) to avoid division by zero
+  - date comparison for license expiration: compare against now.toISOString().split('T')[0] for date-only comparison
+  - Also added listClinicians() for future clinician dashboard (US-006 notes mention needing GET /api/clinicians)
+---
+
+## 2026-03-04 - US-005
+- Implemented appointment booking endpoint with pessimistic locking for concurrent-safe slot booking
+- Files created: src/modules/appointment/dto/book-appointment.dto.ts, src/modules/appointment/appointment.service.ts, src/modules/appointment/appointment.controller.ts
+- Files modified: src/modules/appointment/appointment.module.ts (added TypeOrmModule.forFeature, controller, service)
+- Endpoint: POST /api/appointments — books a slot with pessimistic_write lock, validates slot availability, clinician-slot ownership, patient existence, and state licensure
+- Concurrent booking: first request succeeds (201), second gets 409 conflict
+- **Learnings for future iterations:**
+  - Use innerJoinAndSelect (not leftJoinAndSelect) when applying pessimistic_write lock — PostgreSQL FOR UPDATE cannot be applied to the nullable side of an outer join
+  - Use intermediate `DeepPartial<Entity>` variable for queryRunner.manager.create() — same overload resolution issue as Repository.create()
+  - Cast DTO string fields to entity union types (e.g., `dto.visitType as VisitType`) before passing to create() — TS won't narrow string to union automatically
+  - Licensure check within transaction ensures consistency — queries state_license for verified, non-expired license in patient's state
 ---

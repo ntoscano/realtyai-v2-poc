@@ -84,7 +84,7 @@
 				"Typecheck passes"
 			],
 			"priority": 4,
-			"passes": false,
+			"passes": true,
 			"notes": "The matching query involves joins across clinician, state_license, clinician_specialty, specialty, and availability_slot. Use QueryBuilder for the complex filtering. For max_available in the score calculation, use the maximum available_slot_count across all matched clinicians (or a fixed number like 20 to avoid division-by-zero). listPatients goes in ClinicianController under /api/patients for convenience — or create a separate PatientController if cleaner. The symptom-to-specialty mapping should be extracted to a shared utility so both QuestionnaireService and ClinicianService can use it."
 		},
 		{
@@ -101,7 +101,7 @@
 				"Typecheck passes"
 			],
 			"priority": 5,
-			"passes": false,
+			"passes": true,
 			"notes": "Same pessimistic locking pattern as shift-api booking. Use DataSource.createQueryRunner(), setLock('pessimistic_write') on the AvailabilitySlot row. Use innerJoinAndSelect (not leftJoinAndSelect) when locking — PostgreSQL FOR UPDATE cannot be applied to nullable side of outer join. The licensure check queries state_license within the transaction to ensure consistency."
 		},
 		{
