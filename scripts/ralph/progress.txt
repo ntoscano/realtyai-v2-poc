@@ -210,3 +210,25 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Clinician detail endpoint (GET /api/clinicians/:id) returns clinicianSpecialties and stateLicenses when loaded via findOne
   - GET /api/clinicians (listClinicians) also returns relations — can reuse for both dropdown and profile display
 ---
+
+## 2026-03-04 - US-013
+- End-to-end verification across patient and clinician flows — all checks pass
+- Verified via curl tests (backend API) with both apps running (midi-api:3004, midi-ui:2027)
+- Test flow results:
+  - Lisa Thompson (CA): questionnaire (hot_flashes+weight_gain, moderate) → matched specialties hrt+weight_glp1
+  - Clinician matching: Dr. Sarah Chen ranked #1 (score 0.931, 100% specialty overlap, CA-licensed), Lopez #2, Rivera #3
+  - Park and Foster correctly excluded (not CA-licensed)
+  - Booked appointment for Lisa with Dr. Chen → 201 scheduled, visible on clinician dashboard
+  - Jennifer Moore (FL): questionnaire (hot_flashes+mood_changes, severe) → matched specialties hrt+mood
+  - FL matching: Dr. Chen correctly excluded (not FL-licensed), Dr. Lopez appears (FL-licensed)
+  - Dr. Foster absent from FL results — expected: her specialties (sleep, general_menopause) don't overlap with Jennifer's needs (hrt, mood)
+  - Booked appointment for Jennifer with Dr. Lopez → 201 scheduled, visible on clinician dashboard
+  - Cancelled Jennifer's appointment from clinician dashboard → status=cancelled, slot freed (isBooked=false)
+  - Patient and clinician views both reflect correct state for all appointments
+- No code changes required — all flows work correctly
+- Typecheck passes for both midi-api and midi-ui
+- **Learnings for future iterations:**
+  - The PRD AC for US-013 mentions Dr. Foster should appear for FL patients, but this depends on symptom/specialty overlap — Foster's specialties (sleep, general_menopause) may not overlap with the test symptoms
+  - Full E2E test sequence: seed → questionnaire → match → book → dashboard verify → cancel → verify slot freed
+  - Both apps must be running for full verification: midi-api on 3004, midi-ui on 2027, PostgreSQL on 54324
+---

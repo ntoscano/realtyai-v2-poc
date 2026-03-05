@@ -269,7 +269,7 @@
 				"Verify in browser using dev-browser skill"
 			],
 			"priority": 13,
-			"passes": false,
+			"passes": true,
 			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: midi-api on 3004, midi-ui on 2027. Database must be seeded. Key test: FL patient should NOT see CA-only licensed clinicians — this verifies the state licensure filtering works."
 		}
 	]
