@@ -116,17 +116,25 @@ Produce the following:
 │  │  │ If no match → attempt RAG lookup against plan docs      │  │  │
 │  │  └────────────────────────────────────────────────────────┘  │  │
 │  │                                                                │  │
-│  │  Step 3: RAG Eligibility Determination ────────────────────┐  │  │
+│  │  Step 3: RAG Coverage Classification ──────────────────────┐  │  │
 │  │  │ Filter plan documents by payer + state (metadata)       │  │  │
 │  │  │ Vector search: "does [plan] cover telehealth            │  │  │
 │  │  │   menopause care in [state]?"                           │  │  │
 │  │  │ Top-k documents → LLM prompt with retrieved context     │  │  │
-│  │  │ Structured output: { covered, copay, coinsurance,       │  │  │
-│  │  │   deductible_applies, confidence, source_documents }    │  │  │
-│  │  │ Validate LLM output against schema                      │  │  │
+│  │  │ LLM answers ONLY: { covered: bool, confidence,          │  │  │
+│  │  │   reasoning, cited_sections }                           │  │  │
+│  │  │ LLMs classify well; never ask them to compute $$$       │  │  │
 │  │  └────────────────────────────────────────────────────────┘  │  │
 │  │                                                                │  │
-│  │  Step 4: Store result → update EligibilityCheck record         │  │
+│  │  Step 4: Deterministic Benefits Lookup ───────────────────┐  │  │
+│  │  │ If covered → look up financials from structured data:   │  │  │
+│  │  │   InsurancePlan table: copay_cents, coinsurance_pct,    │  │  │
+│  │  │   deductible_applies (pre-parsed from plan docs)        │  │  │
+│  │  │ If plan not in DB → flag needs_review for manual entry  │  │  │
+│  │  │ Copays/coinsurance are NEVER LLM-generated              │  │  │
+│  │  └────────────────────────────────────────────────────────┘  │  │
+│  │                                                                │  │
+│  │  Step 5: Store result → update EligibilityCheck record         │  │
 │  └────────────────────────────────────────────────────────────────┘  │
 └────────┬──────────────────────┬──────────────────────┬───────────────┘
          │                      │                      │
@@ -258,9 +266,10 @@ eligibility_check
 ├── extracted_member_id: VARCHAR(100)
 ├── matched_payer_id: UUID (FK → payer, nullable)
 ├── matched_plan_id: UUID (FK → insurance_plan, nullable)
-├── is_eligible: BOOLEAN  -- null until determination
+├── is_eligible: BOOLEAN  -- null until determination (from LLM classification)
 ├── coverage_details: JSONB  -- { copay_cents, coinsurance_pct, deductible_applies, notes }
-├── rag_confidence: DECIMAL(5,4)  -- LLM confidence in determination
+│   -- Financial values sourced from InsurancePlan table (deterministic), NOT LLM-generated
+├── rag_confidence: DECIMAL(5,4)  -- LLM confidence in coverage classification (not financials)
 ├── source_document_ids: UUID[]  -- which plan docs were used
 ├── reviewed_by: UUID  -- FK to admin/staff if manually reviewed
 ├── reviewed_at: TIMESTAMPTZ
@@ -409,25 +418,41 @@ GET    /api/plans?payer_id=X    -- List plans for a payer
    → If exact match with known coverage data → return immediately (no RAG needed)
    → This handles the 80% case where we already know the plan
 
-3. If no exact match → RAG query
+3. If no exact match → RAG coverage classification
    → Build query: "Does [payer] [plan type] cover telehealth menopause care
      including hormone replacement therapy in [state]?"
    → Filter: metadata.payer_id = matched_payer AND metadata.state IN (patient_state, null)
    → Vector search: top 5 chunks by cosine similarity
    → Minimum similarity threshold: 0.75 (below = low confidence)
 
-4. LLM generation with retrieved context
+4. LLM classifies coverage (yes/no only — no financial math)
    → System prompt: "You are an insurance coverage analyst. Based on the plan
-     documents provided, determine coverage eligibility. Return ONLY valid JSON."
+     documents provided, determine whether the service is covered. Do NOT
+     calculate or extract dollar amounts — only classify coverage."
    → User prompt: retrieved chunks + patient's plan details + structured output schema
    → Model: GPT-4 or Claude (must be BAA-covered for HIPAA)
-   → Parse structured output: { covered: bool, copay_cents, coinsurance_pct,
-     deductible_applies, confidence: 0-1, reasoning: string }
+   → Parse structured output: { covered: bool, confidence: 0-1,
+     reasoning: string, cited_sections: string[] }
+   → WHY: LLMs excel at reading dense legalese and classifying intent
+     ("is menopause care a covered service?"). They are unreliable at
+     extracting precise dollar amounts from tables and computing
+     copay/coinsurance math. Keep the LLM in its strength zone.
 
-5. Validate LLM output
+5. Deterministic benefits lookup (code, not LLM)
+   → If covered=true AND plan matched in DB → pull financials from
+     InsurancePlan record: copay_cents, coinsurance_pct, deductible_applies
+     (pre-parsed and stored as structured data during plan ingestion)
+   → If covered=true BUT plan NOT in DB → status: needs_review
+     (human enters financials; once entered, future lookups are instant)
+   → If covered=false → no financial lookup needed
+   → These dollar values were entered by ops staff or parsed by a deterministic
+     extractor during document ingestion — never generated by the LLM at query time
+
+6. Validate and assemble result
    → Schema validation (all required fields present, types correct)
    → Confidence check: if LLM confidence < 0.7 → status: needs_review
    → Cross-check: if LLM says "not covered" but DB says plan covers telehealth → flag
+   → Merge LLM classification + DB financials into final EligibilityCheck result
    → Never return raw LLM output to the patient without validation
 ```
 
@@ -497,15 +522,16 @@ Frontend polls GET /api/eligibility/:id every 2 seconds
 
 #### Trade-offs
 
-| Decision                        | Alternative                               | Rationale                                                                                                                                                           |
-| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| pgvector (PostgreSQL extension) | Pinecone / Weaviate (dedicated vector DB) | Fewer moving parts. Same database for relational and vector data. Sufficient at <1M chunks. Switch when search latency exceeds 100ms.                               |
-| Section-based chunking          | Fixed-size (512 token) chunking           | Insurance documents have meaningful structure. Section-based preserves context about what is and isn't covered. Slightly more complex ingestion.                    |
-| Bull queue (Redis) for async    | Celery (Python) / SQS (AWS)               | Bull is native to Node.js/NestJS. Redis already needed for caching. SQS is more durable but adds AWS coupling. In Django-land, Celery is the natural choice.        |
-| AWS Textract for OCR            | Tesseract (open-source) / Google Vision   | Textract handles insurance cards well (structured data extraction). Tesseract is free but lower accuracy on cards. Google Vision is comparable but different cloud. |
-| Polling for async results       | WebSocket / SSE push                      | Simpler to implement and debug. No connection state to manage. 2-second polling interval means <2s additional latency. WebSocket is better UX for production.       |
-| Direct DB lookup before RAG     | Always RAG                                | 80% of patients have plans we already know. Skipping RAG for known plans is 100x faster and free (no LLM cost). RAG is the fallback, not the default path.          |
-| Structured output parsing       | Free-text LLM response                    | Coverage decisions must be machine-readable (copay amount, boolean covered). Free-text requires another parsing step and is error-prone.                            |
+| Decision                                                         | Alternative                                              | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pgvector (PostgreSQL extension)                                  | Pinecone / Weaviate (dedicated vector DB)                | Fewer moving parts. Same database for relational and vector data. Sufficient at <1M chunks. Switch when search latency exceeds 100ms.                                                                                                                                                                                                                                                                                       |
+| Section-based chunking                                           | Fixed-size (512 token) chunking                          | Insurance documents have meaningful structure. Section-based preserves context about what is and isn't covered. Slightly more complex ingestion.                                                                                                                                                                                                                                                                            |
+| Bull queue (Redis) for async                                     | Celery (Python) / SQS (AWS)                              | Bull is native to Node.js/NestJS. Redis already needed for caching. SQS is more durable but adds AWS coupling. In Django-land, Celery is the natural choice.                                                                                                                                                                                                                                                                |
+| AWS Textract for OCR                                             | Tesseract (open-source) / Google Vision                  | Textract handles insurance cards well (structured data extraction). Tesseract is free but lower accuracy on cards. Google Vision is comparable but different cloud.                                                                                                                                                                                                                                                         |
+| Polling for async results                                        | WebSocket / SSE push                                     | Simpler to implement and debug. No connection state to manage. 2-second polling interval means <2s additional latency. WebSocket is better UX for production.                                                                                                                                                                                                                                                               |
+| Direct DB lookup before RAG                                      | Always RAG                                               | 80% of patients have plans we already know. Skipping RAG for known plans is 100x faster and free (no LLM cost). RAG is the fallback, not the default path.                                                                                                                                                                                                                                                                  |
+| LLM for classification only, deterministic lookup for financials | LLM extracts everything (copay, coinsurance, deductible) | LLMs are unreliable at extracting precise dollar amounts from benefit tables and computing cost-sharing math. Classification ("is this covered?") plays to the LLM's strength — reading dense plan language. Financial values (copay_cents, coinsurance_pct) are pre-parsed during document ingestion and stored as structured data. This makes the financial output deterministic, auditable, and immune to hallucination. |
+| Structured output parsing                                        | Free-text LLM response                                   | Coverage decisions must be machine-readable (copay amount, boolean covered). Free-text requires another parsing step and is error-prone.                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -699,6 +725,10 @@ CHECK (expiration_date > issued_date)
 ```
 
 **AvailabilitySlot**
+
+In production, slots are **materialized from availability rules** — clinicians define recurring patterns (e.g., "Mon-Fri 9am-1pm, 30-min slots") and a background job generates slot rows in batches (nightly or on rule change). This is the industry-standard hybrid approach used by Zocdoc, Doctolib, and EHR systems. The slot table below represents the materialized output. For POC scope, we seed slots directly (simulating what the rule engine would produce).
+
+This model maps directly to the **FHIR R4 Slot resource** (statuses: free, busy, busy-unavailable), which is the standard interoperability format for EHR scheduling. Note that FHIR Slots have no native recurrence — recurrence must be managed externally via rules or extensions.
 
 ```
 availability_slot
@@ -944,9 +974,55 @@ COMMIT;
 
 Same pattern as the shift booking in the Clipboard challenge — `FOR UPDATE` lock on the slot row. Second transaction waits, then sees `is_booked = TRUE` and gets 409.
 
-**Why slot-based over calendar math:** Pre-defined slots are simpler to lock and query than computing availability from appointment windows. Each slot is an atomic lockable row. Trade-off: clinician or admin must create slots in advance.
+**Concrete concurrent booking walkthrough:**
 
-**Alternative considered:** Optimistic locking (version column on slot). Viable but requires client-side retry logic. Not worth the complexity at this contention level.
+Scenario: Lisa (CA) and Karen (NY) both see Dr. Chen's 10:00 AM slot and click "Book" at the same instant.
+
+```
+Timeline:
+────────────────────────────────────────────────────────────
+
+Lisa's request                    Karen's request
+     │                                 │
+     ▼                                 ▼
+BEGIN TRANSACTION               BEGIN TRANSACTION
+     │                                 │
+     ▼                                 ▼
+SELECT * FROM availability_slot  SELECT * FROM availability_slot
+WHERE id = 'slot-123'            WHERE id = 'slot-123'
+FOR UPDATE;                      FOR UPDATE;
+     │                                 │
+     ▼                                 ▼
+Lisa GETS the lock ✅             Karen WAITS (blocked by lock) ⏳
+slot.is_booked = FALSE                 │
+     │                                 │
+     ▼                                 │
+INSERT INTO appointment ...            │
+SET is_booked = TRUE                   │
+COMMIT; ✅                             │
+     │                                 ▼
+     │                           Karen's query RESUMES
+     │                           slot.is_booked = TRUE
+     │                                 │
+     │                                 ▼
+     │                           → 409 Conflict
+     │                           "This time slot is no longer
+     │                            available"
+     │                                 │
+     │                                 ▼
+     │                           ROLLBACK; ❌
+```
+
+The guarantee comes from PostgreSQL, not application code. `FOR UPDATE` provides serialized access to that specific row — only one transaction holds the lock at a time. The second transaction doesn't get stale data; it waits until the first finishes, then reads the fresh state.
+
+- **Lisa** gets a 201 with her appointment confirmation
+- **Karen** gets a 409. The frontend shows "This time slot is no longer available" inline and refreshes the slot list so she can pick another time
+
+The lock is held for milliseconds (validate → insert → update → commit). Contention is low — at most 2-3 patients competing for the same slot, not thousands. This is per-slot, not a global lock, so booking Dr. Chen's 10:00 AM slot doesn't block booking her 10:30 AM slot.
+
+**Why materialized slots over calendar math:** The industry-standard pattern is a hybrid — clinicians define availability rules (recurring patterns), and a background job materializes slot rows in batches. Booking then locks the materialized row. This gives you the simplicity of slot-based locking with the flexibility of rule-based scheduling. Pure calendar math (computing free windows at query time) avoids storing slot rows but makes concurrency harder — there's no row to lock, so you need advisory locks or serializable isolation. Zocdoc, Doctolib, and Athenahealth all use some form of materialized slots. For POC scope, we seed slots directly to simulate the rule engine output.
+
+**Alternative considered:** Optimistic locking (version column on slot). Viable but requires client-side retry logic — both requests read the slot simultaneously, both try to `UPDATE ... WHERE version = 1`, second one affects 0 rows and must retry. More complex error handling and extra round trips on conflict. Not worth it at this contention level where pessimistic locking is simpler and sufficient.
 
 #### Multi-State Licensure
 
@@ -1005,25 +1081,26 @@ After visit:
 
 #### Scalability Notes
 
-| Concern                        | Trigger                                    | Solution                                                                                                                                                                                              |
-| ------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Matching query latency         | 5000+ clinicians, 50 states                | Composite indexes on `state_license(state, expiration_date, is_verified)` and `clinician_specialty(specialty_id)`. Materialized view of "active clinicians per state per specialty" refreshed hourly. |
-| Slot search throughput         | 100K+ slots per week                       | Partition `availability_slot` by month. Index on `(clinician_id, start_time, is_booked)`. Archive past slots.                                                                                         |
-| Appointment booking contention | Popular clinician, many patients           | Pessimistic locking is per-slot, not global. Contention is low (2-3 patients competing for same slot, not 10,000). Scale horizontally with read replicas for matching queries.                        |
-| Multi-timezone scheduling      | Patients + clinicians across US time zones | Store all times as TIMESTAMPTZ (UTC). Frontend converts to local time. Clinician sets availability in their local time, converted to UTC on save.                                                     |
-| Notification fan-out           | Appointment reminders, cancellation alerts | Extract to async worker (Bull queue). Email/SMS via SendGrid/Twilio. Don't block the booking response on notification delivery.                                                                       |
+| Concern                        | Trigger                                          | Solution                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Matching query latency         | 5000+ clinicians, 50 states                      | Composite indexes on `state_license(state, expiration_date, is_verified)` and `clinician_specialty(specialty_id)`. Materialized view of "active clinicians per state per specialty" refreshed hourly. |
+| Slot search throughput         | 100K+ slots per week                             | Partition `availability_slot` by month. Index on `(clinician_id, start_time, is_booked)`. Archive past slots. Cache availability reads in Redis (Zocdoc handles 70K keys/sec this way).               |
+| Slot generation at scale       | 5000 clinicians × 40 slots/week = 200K rows/week | Background job (Bull queue) materializes slots from availability rules nightly or on rule change. Batch insert, not one-by-one. Regenerate affected slots when rules change — don't update in place.  |
+| Appointment booking contention | Popular clinician, many patients                 | Pessimistic locking is per-slot, not global. Contention is low (2-3 patients competing for same slot, not 10,000). Scale horizontally with read replicas for matching queries.                        |
+| Multi-timezone scheduling      | Patients + clinicians across US time zones       | Store all times as TIMESTAMPTZ (UTC). Frontend converts to local time. Clinician sets availability in their local time, converted to UTC on save.                                                     |
+| Notification fan-out           | Appointment reminders, cancellation alerts       | Extract to async worker (Bull queue). Email/SMS via SendGrid/Twilio. Don't block the booking response on notification delivery.                                                                       |
 
 #### Trade-offs
 
-| Decision                       | Alternative                             | Rationale                                                                                                                                                                             |
-| ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre-defined availability slots | Calendar-based free/busy calculation    | Slots are lockable rows — simple concurrency model. Calendar math requires computing availability from existing appointments + working hours, which is complex and harder to lock.    |
-| Separate StateLicense entity   | `licensed_states: TEXT[]` on clinician  | Licenses have attributes (expiration, verification, license number). A string array loses this. The join cost is negligible.                                                          |
-| Weighted scoring for matching  | Simple filter + random / round-robin    | Patients get better matches (specialty fit + availability). Round-robin ignores clinical fit. ML-based matching is premature at this scale.                                           |
-| Pessimistic locking on slots   | Optimistic locking (version column)     | Low contention per-slot. Simpler — no retry loops. Same proven pattern as shift booking.                                                                                              |
-| Slot-based 30-min increments   | Flexible duration appointments          | Uniform slots simplify scheduling UI and concurrency. Follow-ups could be shorter but 30-min slots are standard for telehealth. Add appointment types with different durations later. |
-| REST API                       | GraphQL                                 | Fixed set of endpoints with known queries. Matching endpoint returns a defined shape. GraphQL adds value when frontend needs vary significantly across views.                         |
-| TIMESTAMPTZ for all times      | Separate date + time + timezone columns | PostgreSQL TIMESTAMPTZ handles timezone conversion correctly. One column, not three. Frontend converts for display.                                                                   |
+| Decision                                   | Alternative                               | Rationale                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Materialized slots from availability rules | Pure calendar-based free/busy calculation | Industry standard hybrid: clinicians define recurring rules, system materializes slot rows in batches (Zocdoc, Doctolib, Athenahealth all do this). Gives lockable rows for concurrency + rule-based flexibility. Pure calendar math avoids slot storage but requires advisory locks or serializable isolation for concurrency — more complex, less auditable. FHIR R4 Slot resource aligns with materialized approach. |
+| Separate StateLicense entity               | `licensed_states: TEXT[]` on clinician    | Licenses have attributes (expiration, verification, license number). A string array loses this. The join cost is negligible.                                                                                                                                                                                                                                                                                            |
+| Weighted scoring for matching              | Simple filter + random / round-robin      | Patients get better matches (specialty fit + availability). Round-robin ignores clinical fit. ML-based matching is premature at this scale.                                                                                                                                                                                                                                                                             |
+| Pessimistic locking on slots               | Optimistic locking (version column)       | Low contention per-slot. Simpler — no retry loops. Same proven pattern as shift booking.                                                                                                                                                                                                                                                                                                                                |
+| Slot-based 30-min increments               | Flexible duration appointments            | Uniform slots simplify scheduling UI and concurrency. Follow-ups could be shorter but 30-min slots are standard for telehealth. Add appointment types with different durations later.                                                                                                                                                                                                                                   |
+| REST API                                   | GraphQL                                   | Fixed set of endpoints with known queries. Matching endpoint returns a defined shape. GraphQL adds value when frontend needs vary significantly across views.                                                                                                                                                                                                                                                           |
+| TIMESTAMPTZ for all times                  | Separate date + time + timezone columns   | PostgreSQL TIMESTAMPTZ handles timezone conversion correctly. One column, not three. Frontend converts for display.                                                                                                                                                                                                                                                                                                     |
 
 ---
 
@@ -1031,12 +1108,12 @@ After visit:
 
 ### Challenge 1: Insurance Eligibility (RAG Pipeline)
 
-| Score      | Description                                                                                                                                                                                                                                                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Strong** | Clear separation of offline ingestion vs. online query. Async processing with job queue (not synchronous). Metadata-filtered vector search (not searching all documents). LLM output validation (structured output, confidence thresholds, fallback to human review). HIPAA considerations specific and actionable. 3+ trade-offs with alternatives. |
-| **Solid**  | Correct RAG pipeline flow. Mentioned async processing. Some HIPAA awareness. At least 2 trade-offs. May have gaps in error handling or document ingestion strategy.                                                                                                                                                                                  |
-| **Weak**   | Synchronous API call for OCR + RAG. No confidence thresholds or fallback. Vague on HIPAA ("encrypt everything"). No document ingestion strategy.                                                                                                                                                                                                     |
-| **Miss**   | No async processing. Trusts raw LLM output for coverage decisions. No HIPAA consideration. No understanding of the two-phase (ingestion vs. query) RAG architecture.                                                                                                                                                                                 |
+| Score      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Strong** | Clear separation of offline ingestion vs. online query. Async processing with job queue (not synchronous). Metadata-filtered vector search (not searching all documents). LLM used for classification only (covered/not covered) — financial values (copay, coinsurance) from structured data, not LLM. Confidence thresholds with fallback to human review. HIPAA considerations specific and actionable. 3+ trade-offs with alternatives. |
+| **Solid**  | Correct RAG pipeline flow. Mentioned async processing. Some HIPAA awareness. At least 2 trade-offs. May have gaps in error handling or document ingestion strategy.                                                                                                                                                                                                                                                                         |
+| **Weak**   | Synchronous API call for OCR + RAG. No confidence thresholds or fallback. Vague on HIPAA ("encrypt everything"). No document ingestion strategy.                                                                                                                                                                                                                                                                                            |
+| **Miss**   | No async processing. Uses LLM to generate financial values (copay, coinsurance) — hallucination risk on dollar amounts. No HIPAA consideration. No understanding of the two-phase (ingestion vs. query) RAG architecture.                                                                                                                                                                                                                   |
 
 ### Challenge 2: Clinician Matching & Scheduling
 
