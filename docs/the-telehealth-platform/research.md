@@ -1,8 +1,8 @@
-# Midi Health — Reverse-Engineered Architecture
+# The Telehealth Platform — Reverse-Engineered Architecture
 
 ## The Business
 
-Midi is a virtual specialty clinic for women's midlife hormonal health (perimenopause, menopause). 230K+ patients, all 50 states, $150M+ funding (Series C). Revenue comes from insurance-covered telehealth visits + B2B employer benefits + supplements/custom Rx.
+The Telehealth Platform is a virtual specialty clinic for women's midlife hormonal health (perimenopause, menopause). 230K+ patients, all 50 states, $150M+ funding (Series C). Revenue comes from insurance-covered telehealth visits + B2B employer benefits + supplements/custom Rx.
 
 ## Confirmed Tech Stack
 
@@ -26,7 +26,7 @@ This is the patient-facing onboarding flow. Here's what happens:
 
 - Patient uploads photo of insurance card
 - System extracts plan info (likely OCR → structured data)
-- **RAG pipeline** cross-references extracted plan details against Midi's coverage database — which payers they're in-network with, which plan types qualify, what the expected copay/coinsurance/deductible would be
+- **RAG pipeline** cross-references extracted plan details against The Telehealth Platform's coverage database — which payers they're in-network with, which plan types qualify, what the expected copay/coinsurance/deductible would be
 - Returns a near-instant eligibility determination
 
 Why RAG and not just a lookup table: insurance plans are messy. Plan documents, benefit schedules, and coverage rules are semi-structured text. A RAG approach can ingest payer documentation, index it, and answer "does this specific plan cover telehealth menopause care?" with nuance that a simple database lookup can't handle. The knowledge base would include payer contracts, plan benefit summaries, and state-by-state coverage rules.
@@ -48,7 +48,7 @@ The second offering is the core telehealth platform:
 - Patient completes health questionnaire during onboarding
 - System matches patient to appropriate clinician based on state licensure, availability, specialty (HRT, weight/GLP-1, mood, etc.)
 - Virtual visit scheduling and delivery
-- Care plan generation, prescription management (Midi Custom Rx)
+- Care plan generation, prescription management (The Telehealth Platform Custom Rx)
 - Async messaging between visits
 - Integration with AthenaOne for clinical documentation
 
@@ -115,11 +115,11 @@ Given the job description emphasizes:
 
 ## Sources
 
-- [Midi Health](https://www.joinmidi.com/)
-- [How Midi Works](https://www.joinmidi.com/how-midi-works)
-- [Midi Health on Verifiable (Case Study)](https://verifiable.com/resources/case-studies/midi-health-on-verifiable)
-- [Staff Software Engineer posting (25madison)](https://jobs.25madison.com/companies/midi/jobs/44763197-staff-software-engineer)
-- [Staff Software Engineer posting (Seen)](https://www.seen.careers/jobs/staff-software-engineer-93d64d98)
-- [Midi $50M Series C (Femtech Insider)](https://femtechinsider.com/midi-health-raises-50-million-series-c-for-menopause-care-platform/)
-- [Midi Pricing & Insurance](https://www.joinmidi.com/pricing-insurance)
+- [The Telehealth Platform — Homepage](URL redacted)
+- [How The Telehealth Platform Works](URL redacted)
+- [The Telehealth Platform — Verifiable Case Study](URL redacted)
+- [Staff Software Engineer posting](URL redacted)
+- [Staff Software Engineer posting](URL redacted)
+- [The Telehealth Platform $50M Series C](URL redacted)
+- [The Telehealth Platform Pricing & Insurance](URL redacted)
 - [Athena FHIR APIs](https://docs.athenahealth.com/api/docs/fhir-apis)

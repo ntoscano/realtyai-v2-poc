@@ -1,7 +1,7 @@
-# Inkeep — Technology & Architecture Reference
+# The AI Search Platform — Technology & Architecture Reference
 
-> Background knowledge for interview prep. This doc covers Inkeep's internal systems and stack.
-> For interview strategy and how to architect an AI app, see [inkeep-interview-prep.md](./inkeep-interview-prep.md).
+> Background knowledge for interview prep. This doc covers The AI Search Platform's internal systems and stack.
+> For interview strategy and how to architect an AI app, see [interview-prep.md](./interview-prep.md).
 
 ---
 
@@ -26,12 +26,12 @@
 
 ## 2. Monorepo Structure
 
-The main repo is `inkeep/agents` (963 stars on GitHub):
+The main repo is `the-ai-search-platform/agents` (963 stars on GitHub):
 
 ```
 agents-api/        — REST API (config, state, traces)
 agents-manage-ui/  — Visual drag-and-drop agent builder
-agents-sdk/        — TypeScript SDK (@inkeep/agents-sdk)
+agents-sdk/        — TypeScript SDK (@the-ai-search-platform/agents-sdk)
 agents-cli/        — CLI tools (push/pull 2-way sync)
 agents-ui/         — Chat UI component library
 agents-docs/       — Documentation
@@ -43,11 +43,11 @@ agents-docs/       — Documentation
 
 ### The problem
 
-The original widget (`@inkeep/widgets`) was 5.6MB — Chakra UI for styling, Apollo/GraphQL for data, plus all the transitive dependencies. Loading 5.6MB on a customer's docs page was unacceptable.
+The original widget (`@the-ai-search-platform/widgets`) was 5.6MB — Chakra UI for styling, Apollo/GraphQL for data, plus all the transitive dependencies. Loading 5.6MB on a customer's docs page was unacceptable.
 
 ### The solution: layered component architecture
 
-New widget (`@inkeep/cxkit-react`) is **101.9 KB**. Achieved via a strict layered pattern:
+New widget (`@the-ai-search-platform/cxkit-react`) is **101.9 KB**. Achieved via a strict layered pattern:
 
 ```
 cxkit-types       → pure TS types, zero dependencies
@@ -76,7 +76,7 @@ cxkit-docusaurus  → framework-specific wrappers (thin adapter layer)
 
 ## 4. RAG Pipeline Architecture
 
-This is Inkeep's core product — a multi-tenant retrieval-augmented generation pipeline.
+This is The AI Search Platform's core product — a multi-tenant retrieval-augmented generation pipeline.
 
 ### End-to-end flow
 
@@ -147,7 +147,7 @@ export const mainAgent = agent({
 
 ### 2-way sync (their killer feature)
 
-Code changes sync to the visual builder and vice versa. `inkeep push` / `inkeep pull` CLI commands. Non-technical teams edit agent behavior in the UI; engineers edit in TypeScript. Both stay in sync.
+Code changes sync to the visual builder and vice versa. `the-ai-search-platform push` / `the-ai-search-platform pull` CLI commands. Non-technical teams edit agent behavior in the UI; engineers edit in TypeScript. Both stay in sync.
 
 **Why it matters:** The support manager needs to tweak the agent's personality without filing a ticket to engineering. The engineer needs to add a complex MCP tool without breaking the manager's config. 2-way sync serves both personas from a single source of truth.
 
@@ -177,7 +177,7 @@ Documentation sites (Docusaurus, ReadMe, GitBook, Mintlify), Notion, Confluence,
 
 ## 7. PostHog Case Study Highlights
 
-PostHog is one of Inkeep's flagship customers. Key metrics and insights:
+PostHog is one of The AI Search Platform's flagship customers. Key metrics and insights:
 
 - **33% auto-resolution rate** — one-third of user questions answered without human intervention
 - **Content quality signals** — PostHog staff responses weighted higher; community responses from verified team members get priority
@@ -199,7 +199,7 @@ _What:_ Server-Sent Events — the server sends chunks as they're generated over
 
 _Why it matters:_ LLMs are slow (2-10 seconds for a full response). Without streaming, the user stares at a spinner for the entire duration. With streaming, they see text appear word-by-word, which feels faster even if total time is identical. This is a UX principle called "progressive disclosure of progress."
 
-_Connection to tictactoe:_ Your app doesn't stream — the AI returns a single number, so there's nothing to stream incrementally. But if the interview task is "build a chat widget," you'd need streaming via Vercel AI SDK's `streamText()` + `useChat()`. Inkeep's entire chat interface is built on this pattern.
+_Connection to tictactoe:_ Your app doesn't stream — the AI returns a single number, so there's nothing to stream incrementally. But if the interview task is "build a chat widget," you'd need streaming via Vercel AI SDK's `streamText()` + `useChat()`. The AI Search Platform's entire chat interface is built on this pattern.
 
 ---
 
@@ -209,7 +209,7 @@ _What:_ Running two search algorithms in parallel and merging results. **Sparse 
 
 _Why it matters:_ Neither alone is sufficient. Short, specific queries like error messages need keyword precision (sparse wins). Long, conceptual queries need semantic understanding (dense wins). Running both and merging covers both cases.
 
-_Connection to tictactoe:_ Your project doesn't do search. But if they ask you to design a docs search system, this is the retrieval architecture. Inkeep uses Milvus for vector storage and runs sparse + dense in parallel at query time.
+_Connection to tictactoe:_ Your project doesn't do search. But if they ask you to design a docs search system, this is the retrieval architecture. The AI Search Platform uses Milvus for vector storage and runs sparse + dense in parallel at query time.
 
 ---
 
@@ -227,9 +227,9 @@ _Connection to tictactoe:_ Not directly relevant. But when whiteboarding a RAG p
 
 _What:_ Components that manage state, accessibility, and keyboard interactions but render nothing visible. The consumer provides all the visuals. Radix UI primitives are headless — `Dialog.Root` manages open/close state and focus trapping, but has zero CSS.
 
-_Why it matters:_ Separation of behavior from appearance. Enables tiny bundle sizes because unused styles aren't shipped. Any customer can theme the component to match their brand without fighting pre-applied styles. This is how Inkeep went from 5.6MB (Chakra — opinionated styles baked in) to 101KB (Radix headless + Tailwind on top).
+_Why it matters:_ Separation of behavior from appearance. Enables tiny bundle sizes because unused styles aren't shipped. Any customer can theme the component to match their brand without fighting pre-applied styles. This is how The AI Search Platform went from 5.6MB (Chakra — opinionated styles baked in) to 101KB (Radix headless + Tailwind on top).
 
-_Connection to tictactoe:_ Your `Cell` component is NOT headless — it includes Tailwind styles directly. But if you were building an embeddable widget (like Inkeep's chat), you'd split it: a headless `Cell` primitive that manages click handling + disabled state, and a styled wrapper that applies the visuals.
+_Connection to tictactoe:_ Your `Cell` component is NOT headless — it includes Tailwind styles directly. But if you were building an embeddable widget (like The AI Search Platform's chat), you'd split it: a headless `Cell` primitive that manages click handling + disabled state, and a styled wrapper that applies the visuals.
 
 ---
 
@@ -237,7 +237,7 @@ _Connection to tictactoe:_ Your `Cell` component is NOT headless — it includes
 
 _What:_ A utility that maps component variant props to Tailwind classes declaratively. Instead of `className={isLarge ? "h-12" : "h-10"}` ternaries scattered through your JSX, you define a variant map once and get type-safe variant props.
 
-_Why it matters:_ Type-safe variants (TypeScript catches `size="xtra-large"` as an error). Single source of truth for all styling combinations. Composable with `cn()` (typically `clsx` + `tailwind-merge`) for conditional class merging. This is the styling pattern Inkeep standardized on for `cxkit-styled`.
+_Why it matters:_ Type-safe variants (TypeScript catches `size="xtra-large"` as an error). Single source of truth for all styling combinations. Composable with `cn()` (typically `clsx` + `tailwind-merge`) for conditional class merging. This is the styling pattern The AI Search Platform standardized on for `cxkit-styled`.
 
 _Connection to tictactoe:_ Your project uses shadcn/ui components (Button, Card, Badge, ScrollArea), which are built with CVA internally. In the implementation round, you should be able to write a CVA definition from scratch.
 
@@ -247,7 +247,7 @@ _Connection to tictactoe:_ Your project uses shadcn/ui components (Button, Card,
 
 _What:_ A standard protocol for LLMs to call external tools. Each tool exposes an MCP server with a typed interface. Any MCP-compatible agent can discover and use any MCP tool. Think of it as USB for AI — one protocol, infinite tools.
 
-_Why it matters:_ Instead of writing custom integrations for every external system (Zendesk, GitHub, Linear), you expose each as an MCP server once. Any agent can use it. When a new AI framework comes along, your tools still work. Inkeep uses MCP for their Actions Agent — external API calls go through MCP tools.
+_Why it matters:_ Instead of writing custom integrations for every external system (Zendesk, GitHub, Linear), you expose each as an MCP server once. Any agent can use it. When a new AI framework comes along, your tools still work. The AI Search Platform uses MCP for their Actions Agent — external API calls go through MCP tools.
 
 _Connection to tictactoe:_ Your project doesn't use MCP. But if asked "how would you add the ability for your AI to query a database or call an API?", MCP is the answer for a production system. For a tictactoe game, a simple function call suffices.
 
@@ -259,4 +259,4 @@ _What:_ **Controlled** = parent owns the state via props (`value` + `onChange`).
 
 _Why it matters:_ Library components need to work both ways. Some consumers want full control (form libraries, complex state management). Others want sensible defaults with zero configuration. The `useControllableState` pattern detects whether `value` is provided — if so, controlled mode; if not, uncontrolled with `defaultValue`.
 
-_Connection to tictactoe:_ Your `GameBoard` is effectively controlled — `page.tsx` owns the board state and passes it down as a prop. But your project doesn't need to support both modes because you're not building a library. If Inkeep asks you to build a component that external developers embed, you'd reach for this pattern.
+_Connection to tictactoe:_ Your `GameBoard` is effectively controlled — `page.tsx` owns the board state and passes it down as a prop. But your project doesn't need to support both modes because you're not building a library. If The AI Search Platform asks you to build a component that external developers embed, you'd reach for this pattern.

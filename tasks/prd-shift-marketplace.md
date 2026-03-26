@@ -9,8 +9,8 @@ Two new apps:
 - **`apps/shift-ui`** — Next.js 14 frontend (port 2026)
 - **`apps/shift-api`** — NestJS backend (port 3003)
 
-See `docs/clipboard-health-tech-challenge.md` for architecture rationale and evaluation criteria.
-See `docs/clipboard-health-implementation-plan.md` for detailed file lists and code patterns.
+See `docs/the-staffing-platform/tech-challenge.md` for architecture rationale and evaluation criteria.
+See `docs/the-staffing-platform/implementation-plan.md` for detailed file lists and code patterns.
 
 ## Goals
 

@@ -1,8 +1,8 @@
-# Vitalize Care — Reverse-Engineered Architecture
+# The Workforce Platform — Reverse-Engineered Architecture
 
 ## The Business
 
-Vitalize Care (YC W23) is building the operating system for hospital operations, starting with nurse staffing and scheduling optimization. They automate labor management processes that currently live on paper, spreadsheets, or require departments of 20+ FTEs to manage manually.
+The Workforce Platform (YC W23) is building the operating system for hospital operations, starting with nurse staffing and scheduling optimization. They automate labor management processes that currently live on paper, spreadsheets, or require departments of 20+ FTEs to manage manually.
 
 - **Founded**: 2021 (pivoted from healthcare worker mental health platform)
 - **HQ**: San Francisco, CA
@@ -31,7 +31,7 @@ Vitalize Care (YC W23) is building the operating system for hospital operations,
 
 ## The Product
 
-Vitalize is a unified platform for hospital labor management with four core capabilities:
+The Workforce Platform is a unified platform for hospital labor management with four core capabilities:
 
 ### 1. Real-time Workforce Intelligence
 
@@ -56,30 +56,30 @@ Prompt-driven automation that replaces manual nurse scheduling workflows. Nurses
 - **EMR**: Epic, Oracle Health (Cerner), Meditech
 - **Payroll/HR**: UKG, Symplr, Workday
 - **Time & Attendance**: Interfaces with existing T&A systems
-- Design principle: hospitals don't change how they work — Vitalize fits into existing systems
+- Design principle: hospitals don't change how they work — The Workforce Platform fits into existing systems
 
 ## Domain Primer: Hospital Staffing & Scheduling
 
 Key concepts you need to understand for the interview:
 
-| Concept                     | What It Means                                                                                                                                       |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Census**                  | Current patient count per unit. The primary driver of staffing needs. Changes throughout the day as patients are admitted/discharged.               |
-| **Acuity**                  | How sick patients are. Higher acuity = more nursing hours per patient. An ICU patient needs 1:1 or 1:2 ratios; a med-surg patient might be 1:5.     |
-| **Nurse-to-patient ratios** | Legally mandated in some states (California), hospital policy in others. The core constraint that determines how many nurses you need.              |
-| **Shift types**             | Day (7a-7p), Night (7p-7a), or 8-hour shifts (7a-3p, 3p-11p, 11p-7a). Typically 12h shifts in acute care.                                           |
-| **Float pool**              | Nurses who can work across multiple units based on their skills. More flexible but less specialized. Key resource for filling gaps.                 |
-| **Premium labor**           | Travel nurses, agency nurses, overtime. Costs 2-3x regular staff. What hospitals desperately want to minimize — this is where Vitalize saves money. |
-| **FTE leakage**             | Paying for full-time equivalent positions but not utilizing them efficiently. Nurse is on payroll for 36 hrs/week but only productive for 28.       |
-| **Skills/certifications**   | ICU, ER, L&D, med-surg, NICU, OR, etc. Nurses can't just work anywhere — they need specific certifications for specific units.                      |
-| **Self-scheduling**         | Nurses submit shift preferences for the upcoming schedule period. Managers reconcile preferences with demand. Modern approach to reduce burnout.    |
-| **Charge nurse**            | Shift leader on each unit who makes real-time staffing adjustments (calling in float pool, reassigning patients, etc.).                             |
-| **Staffing office**         | Central department (sometimes 20+ FTEs) that coordinates staffing across the entire hospital. Vitalize's primary user.                              |
-| **Schedule period**         | Typically 4-6 week blocks. Schedules are built weeks in advance, then adjusted daily based on actual census.                                        |
+| Concept                     | What It Means                                                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Census**                  | Current patient count per unit. The primary driver of staffing needs. Changes throughout the day as patients are admitted/discharged.                             |
+| **Acuity**                  | How sick patients are. Higher acuity = more nursing hours per patient. An ICU patient needs 1:1 or 1:2 ratios; a med-surg patient might be 1:5.                   |
+| **Nurse-to-patient ratios** | Legally mandated in some states (California), hospital policy in others. The core constraint that determines how many nurses you need.                            |
+| **Shift types**             | Day (7a-7p), Night (7p-7a), or 8-hour shifts (7a-3p, 3p-11p, 11p-7a). Typically 12h shifts in acute care.                                                         |
+| **Float pool**              | Nurses who can work across multiple units based on their skills. More flexible but less specialized. Key resource for filling gaps.                               |
+| **Premium labor**           | Travel nurses, agency nurses, overtime. Costs 2-3x regular staff. What hospitals desperately want to minimize — this is where The Workforce Platform saves money. |
+| **FTE leakage**             | Paying for full-time equivalent positions but not utilizing them efficiently. Nurse is on payroll for 36 hrs/week but only productive for 28.                     |
+| **Skills/certifications**   | ICU, ER, L&D, med-surg, NICU, OR, etc. Nurses can't just work anywhere — they need specific certifications for specific units.                                    |
+| **Self-scheduling**         | Nurses submit shift preferences for the upcoming schedule period. Managers reconcile preferences with demand. Modern approach to reduce burnout.                  |
+| **Charge nurse**            | Shift leader on each unit who makes real-time staffing adjustments (calling in float pool, reassigning patients, etc.).                                           |
+| **Staffing office**         | Central department (sometimes 20+ FTEs) that coordinates staffing across the entire hospital. The Workforce Platform's primary user.                              |
+| **Schedule period**         | Typically 4-6 week blocks. Schedules are built weeks in advance, then adjusted daily based on actual census.                                                      |
 
 ### The Staffing Problem in a Nutshell
 
-Hospitals face a daily optimization problem: match nursing supply to patient demand across dozens of units, while respecting constraints (certifications, ratios, labor laws, nurse preferences, union rules, overtime limits) and minimizing cost (avoid premium labor). This is currently done manually by staffing offices using spreadsheets and phone calls. Vitalize automates it.
+Hospitals face a daily optimization problem: match nursing supply to patient demand across dozens of units, while respecting constraints (certifications, ratios, labor laws, nurse preferences, union rules, overtime limits) and minimizing cost (avoid premium labor). This is currently done manually by staffing offices using spreadsheets and phone calls. The Workforce Platform automates it.
 
 ## Architecture (Reverse-Engineered)
 
@@ -179,7 +179,7 @@ const reconcile = Effect.all([
 **What it is**: A TypeScript-first SQL ORM. Unlike TypeORM (which you used in Midi), Drizzle is closer to raw SQL with type safety.
 
 **Key differences from TypeORM**:
-| TypeORM (Midi) | Drizzle (Vitalize) |
+| TypeORM (Midi) | Drizzle (The Workforce Platform) |
 |----------------|-------------------|
 | Class-based entities with decorators | Schema defined as plain objects |
 | ActiveRecord or Repository pattern | SQL-like query builder |
@@ -293,9 +293,9 @@ Similar to what you built for Midi:
 
 8. **Early-stage engineering judgment** — They're 23 people. Show you can make pragmatic trade-offs, ship fast, and take ownership of ambiguous problems.
 
-## Comparison: Vitalize vs. Midi (What You Already Know)
+## Comparison: The Workforce Platform vs. Midi (What You Already Know)
 
-| Aspect              | Midi Health                                              | Vitalize Care                                            |
+| Aspect              | Midi Health                                              | The Workforce Platform                                   |
 | ------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | **Domain**          | Virtual menopause care (clinical)                        | Hospital staffing optimization (operational)             |
 | **Stack**           | Django/DRF + React/Next.js                               | TypeScript monorepo + Effect + Bun                       |
@@ -311,16 +311,16 @@ Your Midi work is directly transferable: clinician matching is essentially the s
 
 ## Sources
 
-- [Vitalize Care](https://vitalize.care/)
-- [Vitalize — Y Combinator](https://www.ycombinator.com/companies/vitalize)
-- [Full-Stack Engineer Job Posting — Ashby](https://jobs.ashbyhq.com/vitalize/d907ba5f-0f2f-4bb4-931a-1680d6daf81a)
-- [Vitalize HN Hiring Post](https://news.ycombinator.com/item?id=46880747)
-- [Millions in revenue with a <15 person team — Next Play](https://nextplayso.substack.com/p/millions-in-revenue-with-a-15-person)
-- [Vitalize Care — AVIA Marketplace](https://marketplace.aviahealth.com/product/84264)
-- [Vitalize Care — Paraform](https://www.paraform.com/company/vitalize-care)
-- [Nikhil D'Souza (CTO)](https://nikhil.ai/)
-- [Vitalize Care — Crunchbase](https://www.crunchbase.com/organization/vitalize-care)
-- [Vitalize Care — Wellfound](https://wellfound.com/company/vitalize-care)
+- [The Workforce Platform — Homepage](URL redacted)
+- [The Workforce Platform — Y Combinator](URL redacted)
+- [Full-Stack Engineer Job Posting](URL redacted)
+- [The Workforce Platform — HN Hiring Post](URL redacted)
+- [Revenue profile — Next Play](URL redacted)
+- [The Workforce Platform — AVIA Marketplace](URL redacted)
+- [The Workforce Platform — Paraform](URL redacted)
+- [CTO Profile](URL redacted)
+- [The Workforce Platform — Crunchbase](URL redacted)
+- [The Workforce Platform — Wellfound](URL redacted)
 - [Effect — TypeScript Library](https://effect.website/)
 - [Drizzle ORM](https://orm.drizzle.team/)
 - [PlanetScale](https://planetscale.com/)

@@ -2,14 +2,14 @@
 
 ## Introduction
 
-Build a fullstack POC of Midi Health's clinician matching and appointment scheduling system as an interview prep exercise within the existing Turborepo monorepo. Patients submit a health questionnaire describing symptoms and care goals; the system maps symptoms to specialties and matches patients to qualified clinicians based on specialty alignment, state licensure, and availability; patients book an appointment slot with concurrency-safe booking via pessimistic locking (`SELECT...FOR UPDATE`); both patients and clinicians see appointment status.
+Build a fullstack POC of The Telehealth Platform's clinician matching and appointment scheduling system as an interview prep exercise within the existing Turborepo monorepo. Patients submit a health questionnaire describing symptoms and care goals; the system maps symptoms to specialties and matches patients to qualified clinicians based on specialty alignment, state licensure, and availability; patients book an appointment slot with concurrency-safe booking via pessimistic locking (`SELECT...FOR UPDATE`); both patients and clinicians see appointment status.
 
 Two new apps:
 
-- **`apps/midi-api`** — NestJS backend (port 3004)
-- **`apps/midi-ui`** — Next.js 14 frontend (port 2027)
+- **`apps/telehealth-api`** — NestJS backend (port 3004)
+- **`apps/telehealth-ui`** — Next.js 14 frontend (port 2027)
 
-See `docs/midi-health-tech-challenge.md` Challenge 2 for architecture rationale and evaluation criteria.
+See `docs/the-telehealth-platform/tech-challenge.md` Challenge 2 for architecture rationale and evaluation criteria.
 
 ## Goals
 
@@ -26,12 +26,12 @@ See `docs/midi-health-tech-challenge.md` Challenge 2 for architecture rationale 
 
 **Acceptance Criteria:**
 
-- [ ] `apps/midi-api` created with `package.json` following `apps/tictactoe-api/package.json` patterns (NestJS 10, TypeORM, pg, class-validator, class-transformer)
+- [ ] `apps/telehealth-api` created with `package.json` following `apps/tictactoe-api/package.json` patterns (NestJS 10, TypeORM, pg, class-validator, class-transformer)
 - [ ] `tsconfig.json` follows `apps/tictactoe-api/tsconfig.json` (identical)
 - [ ] `nest-cli.json` follows `apps/tictactoe-api/nest-cli.json` (identical)
-- [ ] `docker-compose.yml` runs `postgres:16` on port 54324 with database `midi_matching`
-- [ ] `.env.example` configured with `PORT=3004`, `POSTGRES_PORT=54324`, `POSTGRES_DB=midi_matching`
-- [ ] Config files created: `src/config/postgres.ts`, `src/config/typeorm.ts`, `src/config/entities.ts` (mirror existing patterns, defaults to port 54324, db `midi_matching`, SnakeNamingStrategy)
+- [ ] `docker-compose.yml` runs `postgres:16` on port 54324 with database `telehealth_matching`
+- [ ] `.env.example` configured with `PORT=3004`, `POSTGRES_PORT=54324`, `POSTGRES_DB=telehealth_matching`
+- [ ] Config files created: `src/config/postgres.ts`, `src/config/typeorm.ts`, `src/config/entities.ts` (mirror existing patterns, defaults to port 54324, db `telehealth_matching`, SnakeNamingStrategy)
 - [ ] `src/main.ts` bootstraps NestJS on port 3004 with CORS enabled and global ValidationPipe
 - [ ] `src/app.module.ts` wires `TypeORM.forRoot` + `QuestionnaireModule` + `ClinicianModule` + `AppointmentModule`
 - [ ] `pnpm install` succeeds from monorepo root
@@ -163,7 +163,7 @@ See `docs/midi-health-tech-challenge.md` Challenge 2 for architecture rationale 
 
 **Acceptance Criteria:**
 
-- [ ] `cd apps/midi-api && pnpm docker:up` — PostgreSQL starts on port 54324
+- [ ] `cd apps/telehealth-api && pnpm docker:up` — PostgreSQL starts on port 54324
 - [ ] `pnpm dev` — backend starts on port 3004, tables auto-created via `synchronize: true`
 - [ ] `pnpm seed` — specialties, clinicians, licenses, patients, slots inserted
 - [ ] `curl GET /api/patients` — returns 4 patients
@@ -182,7 +182,7 @@ See `docs/midi-health-tech-challenge.md` Challenge 2 for architecture rationale 
 
 **Acceptance Criteria:**
 
-- [ ] `apps/midi-ui` created with `package.json` following `apps/tictactoe/package.json` patterns (Next.js 14, React 18, Tailwind)
+- [ ] `apps/telehealth-ui` created with `package.json` following `apps/tictactoe/package.json` patterns (Next.js 14, React 18, Tailwind)
 - [ ] `tsconfig.json` extends shared config with `@/*` alias
 - [ ] `next.config.js`, `postcss.config.js`, `tailwind.config.ts` copied/adapted from `apps/tictactoe/`
 - [ ] `.env.example` with `NEXT_PUBLIC_API_URL=http://localhost:3004`
@@ -190,7 +190,7 @@ See `docs/midi-health-tech-challenge.md` Challenge 2 for architecture rationale 
 - [ ] `src/lib/utils.ts` with `cn()` utility
 - [ ] shadcn/ui components copied: button, card, badge, select, input, textarea, label (from `apps/tictactoe/` or `apps/shift-ui/`)
 - [ ] `src/types/index.ts` defines interfaces: `Patient`, `Clinician`, `Specialty`, `StateLicense`, `AvailabilitySlot`, `Appointment`, `HealthQuestionnaire`, `MatchedClinician`, plus enums/types for symptoms, care goals, severity, menopause stage, visit type, appointment status
-- [ ] `src/lib/api/midiApi.ts` implements fetch wrapper with functions: `listPatients()`, `submitQuestionnaire()`, `matchClinicians()`, `getClinicianSlots()`, `bookAppointment()`, `listAppointments()`, `cancelAppointment()`
+- [ ] `src/lib/api/telehealthApi.ts` implements fetch wrapper with functions: `listPatients()`, `submitQuestionnaire()`, `matchClinicians()`, `getClinicianSlots()`, `bookAppointment()`, `listAppointments()`, `cancelAppointment()`
 - [ ] `src/app/layout.tsx` with nav bar linking to Patient Portal (`/`) and Clinician Dashboard (`/clinician`)
 - [ ] Landing page (`/`) shows a brief welcome message and link to start questionnaire
 - [ ] `pnpm install` succeeds and `pnpm dev` starts on port 2027

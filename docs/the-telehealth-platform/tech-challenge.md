@@ -1,8 +1,8 @@
-# Midi Health — Staff Engineer Architecture Challenge
+# The Telehealth Platform — Staff Engineer Architecture Challenge
 
 Two architecture design exercises for a virtual healthcare platform: (1) Insurance eligibility via RAG pipeline (45 min), (2) Clinician matching and appointment scheduling (45 min). Each exercise includes a reference architecture answer key.
 
-**Note:** Midi's production stack is Django/DRF + React/Next.js. These exercises use NestJS + TypeScript for practice, with a concept mapping between the two stacks so you can translate fluently during the interview.
+**Note:** The Telehealth Platform's production stack is Django/DRF + React/Next.js. These exercises use NestJS + TypeScript for practice, with a concept mapping between the two stacks so you can translate fluently during the interview.
 
 ---
 
@@ -25,7 +25,7 @@ Two architecture design exercises for a virtual healthcare platform: (1) Insuran
 | `signals` (post_save, pre_delete)       | TypeORM `subscribers` / `@AfterInsert()`       | Django signals are global event hooks. TypeORM subscribers are entity-scoped. NestJS often prefers explicit service calls over implicit hooks.                                                                                |
 | `django.test.TestCase`                  | Jest + `@nestjs/testing`                       | Django: built-in test client, transaction rollback per test. NestJS: Jest with `Test.createTestingModule()` for DI. Django's test infra is more batteries-included.                                                           |
 
-**Interview tip:** When discussing architecture at Midi, map your NestJS mental model to Django terms. Say "serializer" not "DTO", "ViewSet" not "Controller", "Celery task" not "Bull job". Show you understand their stack even if your hands-on experience is TypeScript.
+**Interview tip:** When discussing architecture at The Telehealth Platform, map your NestJS mental model to Django terms. Say "serializer" not "DTO", "ViewSet" not "Controller", "Celery task" not "Bull job". Show you understand their stack even if your hands-on experience is TypeScript.
 
 ---
 
@@ -33,10 +33,10 @@ Two architecture design exercises for a virtual healthcare platform: (1) Insuran
 
 ### Scenario
 
-You are building the backend for Midi Health's insurance eligibility system. When a new patient signs up, they upload a photo of their insurance card. The system must:
+You are building the backend for The Telehealth Platform's insurance eligibility system. When a new patient signs up, they upload a photo of their insurance card. The system must:
 
 1. **Extract card data** — OCR the insurance card image to extract payer name, plan ID, group number, and member information.
-2. **Determine eligibility** — Cross-reference extracted plan info against Midi's knowledge base of payer contracts and plan benefit documents to determine if the patient's plan covers telehealth menopause care.
+2. **Determine eligibility** — Cross-reference extracted plan info against The Telehealth Platform's knowledge base of payer contracts and plan benefit documents to determine if the patient's plan covers telehealth menopause care.
 3. **Estimate costs** — Return expected copay, coinsurance, and deductible information based on the plan details.
 4. **Handle uncertainty** — When OCR confidence is low or the plan isn't recognized, route to human review rather than giving a wrong answer.
 
@@ -539,7 +539,7 @@ Frontend polls GET /api/eligibility/:id every 2 seconds
 
 ### Scenario
 
-You are building the backend for Midi Health's clinician matching and scheduling system. When a patient completes onboarding, they fill out a health questionnaire describing their symptoms and goals. The system must:
+You are building the backend for The Telehealth Platform's clinician matching and scheduling system. When a patient completes onboarding, they fill out a health questionnaire describing their symptoms and goals. The system must:
 
 1. **Questionnaire intake** — Patient submits symptoms (hot flashes, weight gain, mood changes, sleep issues, etc.) and care goals.
 2. **Clinician matching** — System matches the patient to qualified clinicians based on: specialty alignment with symptoms, state licensure (clinician must be licensed in patient's state), and availability.
@@ -1063,17 +1063,17 @@ ORDER BY matching_specialty_count DESC, c.rating DESC;
 
 #### EHR Integration Notes (Conceptual)
 
-Midi uses AthenaOne (Athenahealth). In production, appointment data would sync:
+The Telehealth Platform uses AthenaOne (Athenahealth). In production, appointment data would sync:
 
 ```
-Appointment booked in Midi
+Appointment booked in The Telehealth Platform
   → Create Appointment resource in AthenaOne (FHIR R4 or Athena proprietary API)
   → Push: patient demographics, appointment time, clinician, visit type
   → AthenaOne returns: appointment ID, video link (if Athena handles telehealth)
 
 After visit:
   → Clinician documents in AthenaOne (encounter notes, prescriptions)
-  → Midi pulls: encounter status, care plan updates
+  → The Telehealth Platform pulls: encounter status, care plan updates
   → Sync is event-driven (FHIR Subscriptions or polling Athena changelog API)
 ```
 

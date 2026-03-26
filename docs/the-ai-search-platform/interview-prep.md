@@ -1,8 +1,8 @@
-# Inkeep Staff Engineer Interview Prep
+# The AI Search Platform Staff Engineer Interview Prep
 
 > Two-part interview: (1) Whiteboard an architecture for a new AI-powered app (2) Implement it in React/Next.js
 > This doc teaches you **how to think through the design**, using your tictactoe project as a worked example.
-> For Inkeep-specific architecture (RAG pipeline, widgets, agents), see [inkeep-tech-stack.md](./inkeep-tech-stack.md).
+> For The AI Search Platform-specific architecture (RAG pipeline, widgets, agents), see [tech-stack.md](./tech-stack.md).
 
 ---
 
@@ -200,10 +200,10 @@ Defense-in-depth: after the pipeline returns, `AiService.generateMove()` calls `
 #### Architecture decisions and WHY
 
 **Why separate game logic from AI?**
-The LLM picks a position, but `gameLogic.ts` enforces rules. LLMs are probabilistic — they can return illegal moves, hallucinate, or format output wrong. Deterministic validation is the safety net. In `gameLogic.ts`, every function is pure: `checkWinner(board)` returns a `CellValue`, `isValidMove(board, position)` returns a boolean. No side effects, no LLM dependency, fully testable. This is the same pattern in any AI system: the model _suggests_, deterministic code _validates_. Inkeep does this too — their RAG pipeline retrieves context, but confidence scoring determines whether to show the answer.
+The LLM picks a position, but `gameLogic.ts` enforces rules. LLMs are probabilistic — they can return illegal moves, hallucinate, or format output wrong. Deterministic validation is the safety net. In `gameLogic.ts`, every function is pure: `checkWinner(board)` returns a `CellValue`, `isValidMove(board, position)` returns a boolean. No side effects, no LLM dependency, fully testable. This is the same pattern in any AI system: the model _suggests_, deterministic code _validates_. The AI Search Platform does this too — their RAG pipeline retrieves context, but confidence scoring determines whether to show the answer.
 
 **Why a pipeline with discrete nodes?**
-`inputValidation → moveGeneration → moveValidation` — each node has one job. If the LLM fails, you know exactly where. You can retry just the generation node with error feedback. You can swap the LLM (DeepSeek → GPT-4 → Claude) without touching validation. You can add nodes (e.g., a "strategy" node that biases toward center/corners) without rewriting the pipeline. This is graph-based orchestration — the same concept behind Inkeep's agent graphs and LangGraph/LangChain's architecture.
+`inputValidation → moveGeneration → moveValidation` — each node has one job. If the LLM fails, you know exactly where. You can retry just the generation node with error feedback. You can swap the LLM (DeepSeek → GPT-4 → Claude) without touching validation. You can add nodes (e.g., a "strategy" node that biases toward center/corners) without rewriting the pipeline. This is graph-based orchestration — the same concept behind The AI Search Platform's agent graphs and LangGraph/LangChain's architecture.
 
 **Why retries with error feedback?**
 In `moveGenerationNode`, on failure the prompt gets augmented: `"Your previous response was invalid: [errors]. You MUST respond with ONLY a single digit from: [available]"`. The LLM self-corrects on the next attempt. This is a core pattern for any LLM integration — you can't guarantee the first response is valid, so you design for graceful retry. The key insight: retries aren't just "try again" — they include _why_ the last attempt failed, giving the model information to correct itself.
@@ -212,7 +212,7 @@ In `moveGenerationNode`, on failure the prompt gets augmented: `"Your previous r
 The pipeline's `moveValidationNode` validates the move. Then `AiService.generateMove()` calls `isValidMove()` independently. Then `GameService.makeMove()` validates _again_ before applying. Why three layers? In production AI systems, you never trust a single validation layer. The pipeline might have a bug. The LLM might find an edge case your parsing didn't handle. Defense-in-depth means a failure in one layer gets caught by the next. Each layer assumes the previous one might be wrong.
 
 **Why backend as source of truth?**
-Three forces require server authority: (a) PvP requires shared truth — two clients cannot both be the authority, (b) an adversarial client can submit any board state if the frontend is the authority, (c) concurrent moves in PvP need `SELECT...FOR UPDATE` — you cannot do pessimistic locking in client state. The frontend sends _intents_ (`{ position: 4 }`), not state. The backend validates, applies, and returns the canonical game state. This is the same trust model any multi-user system needs — Inkeep's multi-tenant agents require server-side validation of tenant boundaries for the same reason.
+Three forces require server authority: (a) PvP requires shared truth — two clients cannot both be the authority, (b) an adversarial client can submit any board state if the frontend is the authority, (c) concurrent moves in PvP need `SELECT...FOR UPDATE` — you cannot do pessimistic locking in client state. The frontend sends _intents_ (`{ position: 4 }`), not state. The backend validates, applies, and returns the canonical game state. This is the same trust model any multi-user system needs — The AI Search Platform's multi-tenant agents require server-side validation of tenant boundaries for the same reason.
 
 **Why pessimistic locking (`SELECT...FOR UPDATE`)?**
 Two PvP players might click simultaneously. Without locking, both reads see the same board, both moves appear valid, and one overwrites the other — a classic race condition. Pessimistic locking serializes access: the first `SELECT...FOR UPDATE` locks the row, the second waits until the first transaction commits. This is simpler than optimistic locking (version column + retry) for low-contention scenarios — a game has at most 2 concurrent players. For high-contention (100 users editing the same document), you'd reach for optimistic locking instead.
@@ -436,7 +436,7 @@ Don't memorize these as scripts. Understand the principle, and the right thing t
 
 ### The Dual-User Problem
 
-**Principle:** Inkeep serves two builders simultaneously — the support manager who configures agents in a visual UI, and the engineer who writes TypeScript. These users have opposing needs: the manager wants no-code simplicity, the engineer wants full programmatic control. The 2-way sync between visual builder and SDK isn't just a feature — it's the architectural foundation. If the builder and SDK diverge, you have two products fighting each other.
+**Principle:** The AI Search Platform serves two builders simultaneously — the support manager who configures agents in a visual UI, and the engineer who writes TypeScript. These users have opposing needs: the manager wants no-code simplicity, the engineer wants full programmatic control. The 2-way sync between visual builder and SDK isn't just a feature — it's the architectural foundation. If the builder and SDK diverge, you have two products fighting each other.
 
 **How to signal this:** When discussing any configurable system, ask: "Who configures this? Are there multiple personas? Do they need different interfaces to the same underlying system?" This shows you think about the _people_, not just the code.
 
