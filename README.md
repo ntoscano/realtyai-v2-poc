@@ -45,18 +45,18 @@ Ralph spawns a fresh agent per iteration, implements one user story at a time, a
 
 ## Apps
 
-| App                                   | Description                                     | Stack                                               | Port |
-| ------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | ---- |
-| [`tictactoe`](apps/tictactoe)         | AI tic-tac-toe game frontend                    | Next.js 14, Tailwind CSS                            | 2025 |
-| [`tictactoe-api`](apps/tictactoe-api) | Game backend + 2-player WebSocket + AI opponent | NestJS 10, TypeORM, PostgreSQL, Redis, LangGraph    | 3002 |
-| [`realty-ai`](apps/realty-ai)         | Real estate email generation frontend           | Next.js 14, Tailwind CSS, Apollo Client             | 2024 |
-| [`realty-ai-api`](apps/realty-ai-api) | Email gen AI pipeline + promptfoo evals         | NestJS 8, TypeORM, PostgreSQL (pgvector), LangGraph | 3001 |
-| [`shift-api`](apps/shift-api)         | Healthcare shift marketplace backend            | NestJS 10, TypeORM, PostgreSQL                      | 3003 |
-| [`shift-ui`](apps/shift-ui)           | Shift marketplace frontend                      | Next.js 14, Tailwind CSS                            | 2026 |
-| [`midi-api`](apps/midi-api)           | Clinician matching + scheduling backend         | NestJS 10, TypeORM, PostgreSQL                      | 3004 |
-| [`midi-ui`](apps/midi-ui)             | Clinician matching frontend                     | Next.js 14, Tailwind CSS                            | 2027 |
-| [`dashboard`](apps/dashboard)         | Dashboard app                                   | React 18, Webpack 5                                 | 2022 |
-| [`web`](apps/web)                     | Web app                                         | Next.js 13                                          | 2023 |
+| App                                     | Description                                     | Stack                                               | Port |
+| --------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | ---- |
+| [`tictactoe`](apps/tictactoe)           | AI tic-tac-toe game frontend                    | Next.js 14, Tailwind CSS                            | 2025 |
+| [`tictactoe-api`](apps/tictactoe-api)   | Game backend + 2-player WebSocket + AI opponent | NestJS 10, TypeORM, PostgreSQL, Redis, LangGraph    | 3002 |
+| [`realty-ai`](apps/realty-ai)           | Real estate email generation frontend           | Next.js 14, Tailwind CSS, Apollo Client             | 2024 |
+| [`realty-ai-api`](apps/realty-ai-api)   | Email gen AI pipeline + promptfoo evals         | NestJS 8, TypeORM, PostgreSQL (pgvector), LangGraph | 3001 |
+| [`shift-api`](apps/shift-api)           | Healthcare shift marketplace backend            | NestJS 10, TypeORM, PostgreSQL                      | 3003 |
+| [`shift-ui`](apps/shift-ui)             | Shift marketplace frontend                      | Next.js 14, Tailwind CSS                            | 2026 |
+| [`telehealth-api`](apps/telehealth-api) | Clinician matching + scheduling backend         | NestJS 10, TypeORM, PostgreSQL                      | 3004 |
+| [`telehealth-ui`](apps/telehealth-ui)   | Clinician matching frontend                     | Next.js 14, Tailwind CSS                            | 2027 |
+| [`dashboard`](apps/dashboard)           | Dashboard app                                   | React 18, Webpack 5                                 | 2022 |
+| [`web`](apps/web)                       | Web app                                         | Next.js 13                                          | 2023 |
 
 ---
 

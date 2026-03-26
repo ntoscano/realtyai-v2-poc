@@ -1,25 +1,25 @@
 {
 	"project": "Clinician Matching & Appointment Scheduling",
 	"branchName": "ralph/clinician-matching",
-	"description": "Midi Health clinician matching and scheduling POC — patients submit health questionnaires, system maps symptoms to specialties, matches patients to qualified clinicians by specialty + state licensure + availability, concurrent-safe appointment booking via SELECT...FOR UPDATE on availability slots",
+	"description": "The Telehealth Platform clinician matching and scheduling POC — patients submit health questionnaires, system maps symptoms to specialties, matches patients to qualified clinicians by specialty + state licensure + availability, concurrent-safe appointment booking via SELECT...FOR UPDATE on availability slots",
 	"userStories": [
 		{
 			"id": "US-001",
-			"title": "Backend scaffolding for midi-api",
+			"title": "Backend scaffolding for telehealth-api",
 			"description": "As a developer, I need the NestJS backend app scaffolded with PostgreSQL connectivity so that clinician and appointment data can be persisted and queried via REST.",
 			"acceptanceCriteria": [
-				"Create apps/midi-api/package.json following apps/shift-api/package.json patterns (NestJS 10, TypeORM, pg, class-validator, class-transformer)",
-				"Create apps/midi-api/tsconfig.json following apps/shift-api/tsconfig.json (identical)",
-				"Create apps/midi-api/tsconfig.build.json following apps/shift-api/tsconfig.build.json (identical — nest start --watch requires it)",
-				"Create apps/midi-api/nest-cli.json following apps/shift-api/nest-cli.json (identical)",
-				"Create apps/midi-api/docker-compose.yml running postgres:16 on port 54324 with database midi_matching",
-				"Create apps/midi-api/.env.example with PORT=3004, POSTGRES_PORT=54324, POSTGRES_DB=midi_matching",
-				"Create apps/midi-api/.env.local with same values as .env.example",
-				"Create config files: src/config/postgres.ts, src/config/typeorm.ts, src/config/entities.ts (mirror shift-api patterns, defaults to port 54324, db midi_matching, SnakeNamingStrategy)",
+				"Create apps/telehealth-api/package.json following apps/shift-api/package.json patterns (NestJS 10, TypeORM, pg, class-validator, class-transformer)",
+				"Create apps/telehealth-api/tsconfig.json following apps/shift-api/tsconfig.json (identical)",
+				"Create apps/telehealth-api/tsconfig.build.json following apps/shift-api/tsconfig.build.json (identical — nest start --watch requires it)",
+				"Create apps/telehealth-api/nest-cli.json following apps/shift-api/nest-cli.json (identical)",
+				"Create apps/telehealth-api/docker-compose.yml running postgres:16 on port 54324 with database telehealth_matching",
+				"Create apps/telehealth-api/.env.example with PORT=3004, POSTGRES_PORT=54324, POSTGRES_DB=telehealth_matching",
+				"Create apps/telehealth-api/.env.local with same values as .env.example",
+				"Create config files: src/config/postgres.ts, src/config/typeorm.ts, src/config/entities.ts (mirror shift-api patterns, defaults to port 54324, db telehealth_matching, SnakeNamingStrategy)",
 				"Create src/main.ts bootstrapping NestJS on port 3004 with CORS enabled and global ValidationPipe (whitelist: true, forbidNonWhitelisted: true). Load dotenv from .env.local",
 				"Create src/app.module.ts wiring TypeORM.forRoot + QuestionnaireModule + ClinicianModule + AppointmentModule + PatientModule (placeholder modules)",
 				"Create placeholder modules: src/modules/questionnaire/questionnaire.module.ts, src/modules/clinician/clinician.module.ts, src/modules/appointment/appointment.module.ts, src/modules/patient/patient.module.ts",
-				"Add apps/midi-api to root .prettierignore (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)",
+				"Add apps/telehealth-api to root .prettierignore (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)",
 				"Create .eslintrc.js copied from apps/shift-api/.eslintrc.js (with root: true, @typescript-eslint/parser)",
 				"pnpm install succeeds from monorepo root",
 				"docker:up script in package.json starts PostgreSQL container successfully",
@@ -167,22 +167,22 @@
 		},
 		{
 			"id": "US-009",
-			"title": "Frontend scaffolding for midi-ui",
+			"title": "Frontend scaffolding for telehealth-ui",
 			"description": "As a developer, I need the Next.js frontend app scaffolded with Tailwind, shadcn/ui components, types, and API client so I can build the patient and clinician pages.",
 			"acceptanceCriteria": [
-				"Create apps/midi-ui/package.json following apps/shift-ui/package.json patterns (Next.js 14, React 18, Tailwind). Dev server on port 2027",
-				"Create apps/midi-ui/tsconfig.json extending shared config with @/* alias",
-				"Create apps/midi-ui/next.config.js, postcss.config.js, tailwind.config.ts copied/adapted from apps/shift-ui/",
-				"Create apps/midi-ui/.env.example and .env.local with NEXT_PUBLIC_API_URL=http://localhost:3004",
+				"Create apps/telehealth-ui/package.json following apps/shift-ui/package.json patterns (Next.js 14, React 18, Tailwind). Dev server on port 2027",
+				"Create apps/telehealth-ui/tsconfig.json extending shared config with @/* alias",
+				"Create apps/telehealth-ui/next.config.js, postcss.config.js, tailwind.config.ts copied/adapted from apps/shift-ui/",
+				"Create apps/telehealth-ui/.env.example and .env.local with NEXT_PUBLIC_API_URL=http://localhost:3004",
 				"Create src/app/globals.css with Tailwind base + shadcn theme variables (copy from shift-ui)",
 				"Create src/lib/utils.ts with cn() utility",
 				"Copy shadcn/ui components from apps/shift-ui/src/components/ui/: badge.tsx, button.tsx, card.tsx (and any others available)",
 				"Create src/types/index.ts defining interfaces: Patient, Clinician, Specialty, StateLicense, AvailabilitySlot, Appointment, HealthQuestionnaire, MatchedClinician, plus type literals for symptoms, care goals, severity, menopause stage, visit type, appointment status",
-				"Create src/lib/api/midiApi.ts with apiFetch wrapper and functions: listPatients(), submitQuestionnaire(data), matchClinicians(patientId, questionnaireId), getClinicianDetail(id), getClinicianSlots(id, from?, to?), bookAppointment(data), listAppointments(params), cancelAppointment(id), listClinicians()",
-				"Create src/app/layout.tsx with title 'Midi Health' and nav bar linking to / (Patient Portal) and /clinician (Clinician Dashboard)",
+				"Create src/lib/api/telehealthApi.ts with apiFetch wrapper and functions: listPatients(), submitQuestionnaire(data), matchClinicians(patientId, questionnaireId), getClinicianDetail(id), getClinicianSlots(id, from?, to?), bookAppointment(data), listAppointments(params), cancelAppointment(id), listClinicians()",
+				"Create src/app/layout.tsx with title 'The Telehealth Platform' and nav bar linking to / (Patient Portal) and /clinician (Clinician Dashboard)",
 				"Create src/app/page.tsx landing page with welcome message and link to /questionnaire",
 				"Create placeholder pages: src/app/questionnaire/page.tsx, src/app/clinician/page.tsx",
-				"Add apps/midi-ui to root .prettierignore",
+				"Add apps/telehealth-ui to root .prettierignore",
 				"pnpm install succeeds and pnpm dev starts on port 2027",
 				"Typecheck passes"
 			],
@@ -270,7 +270,7 @@
 			],
 			"priority": 13,
 			"passes": false,
-			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: midi-api on 3004, midi-ui on 2027. Database must be seeded. Key test: FL patient should NOT see CA-only licensed clinicians — this verifies the state licensure filtering works."
+			"notes": "This is a verification story — fix any issues found during end-to-end testing. Both apps must be running: telehealth-api on 3004, telehealth-ui on 2027. Database must be seeded. Key test: FL patient should NOT see CA-only licensed clinicians — this verifies the state licensure filtering works."
 		}
 	]
 }

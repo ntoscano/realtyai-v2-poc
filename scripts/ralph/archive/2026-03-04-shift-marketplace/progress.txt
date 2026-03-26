@@ -2,8 +2,8 @@
 Started:
 
 ## Codebase Patterns
-- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace, 54324 = midi-matching
-- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui, 2027 = midi-ui
+- Port convention: 54321 = realty-ai, 54322 = tictactoe, 54323 = shift-marketplace, 54324 = telehealth-matching
+- Frontend port convention: 2025 = tictactoe, 2026 = shift-ui, 2027 = telehealth-ui
 - NestJS apps use `dotenv.config({ path: path.join(__dirname, '../.env.local') })` at top of main.ts
 - TypeORM config uses `getConfig()` from postgres.ts for connection params
 - SnakeNamingStrategy for all TypeORM entities (camelCase TS -> snake_case DB)

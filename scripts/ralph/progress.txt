@@ -2,8 +2,8 @@
 Started: Wed Mar  4 16:37:23 PST 2026
 
 ## Codebase Patterns
-- Port assignments: 54321=realty-ai, 54322=tictactoe, 54323=shift-marketplace, 54324=midi-matching
-- App ports: 3003=shift-api, 3004=midi-api, UI ports: 2026=shift-ui, 2027=midi-ui
+- Port assignments: 54321=realty-ai, 54322=tictactoe, 54323=shift-marketplace, 54324=telehealth-matching
+- App ports: 3003=shift-api, 3004=telehealth-api, UI ports: 2026=shift-ui, 2027=telehealth-ui
 - Always add NestJS apps to root .prettierignore (root uses @trivago/prettier-plugin-sort-imports which fails on TS decorators)
 - NestJS apps need a local .prettierrc.js (without the sort-imports plugin) so eslint's prettier/recommended can parse decorators
 - Symptom-to-specialty mapping is in src/shared/symptom-specialty-map.ts — reuse in both QuestionnaireService and ClinicianService
@@ -19,9 +19,9 @@ Started: Wed Mar  4 16:37:23 PST 2026
 ---
 
 ## 2026-03-04 - US-001
-- Scaffolded apps/midi-api/ with NestJS 10, TypeORM, PostgreSQL config
+- Scaffolded apps/telehealth-api/ with NestJS 10, TypeORM, PostgreSQL config
 - Files created: package.json, tsconfig.json, tsconfig.build.json, nest-cli.json, docker-compose.yml, .env.example, .env.local, .eslintrc.js, src/main.ts, src/app.module.ts, src/config/postgres.ts, src/config/typeorm.ts, src/config/entities.ts, 4 placeholder modules
-- Updated root .prettierignore to include apps/midi-api
+- Updated root .prettierignore to include apps/telehealth-api
 - **Learnings for future iterations:**
   - shift-api source files exist on ralph/shift-marketplace branch, not on main — use git show to reference them
   - .env.local was created as part of scaffolding (same values as .env.example for local dev)
@@ -131,11 +131,11 @@ Started: Wed Mar  4 16:37:23 PST 2026
 ---
 
 ## 2026-03-04 - US-009
-- Scaffolded apps/midi-ui/ with Next.js 14, React 18, Tailwind CSS, shadcn/ui components
-- Files created: package.json, tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts, .env.example, .env.local, src/app/globals.css, src/lib/utils.ts, src/components/ui/button.tsx, src/components/ui/card.tsx, src/components/ui/badge.tsx, src/types/index.ts, src/lib/api/midiApi.ts, src/app/layout.tsx, src/app/page.tsx, src/app/questionnaire/page.tsx, src/app/clinician/page.tsx
-- Updated root .prettierignore to include apps/midi-ui
+- Scaffolded apps/telehealth-ui/ with Next.js 14, React 18, Tailwind CSS, shadcn/ui components
+- Files created: package.json, tsconfig.json, next.config.js, postcss.config.js, tailwind.config.ts, .env.example, .env.local, src/app/globals.css, src/lib/utils.ts, src/components/ui/button.tsx, src/components/ui/card.tsx, src/components/ui/badge.tsx, src/types/index.ts, src/lib/api/telehealthApi.ts, src/app/layout.tsx, src/app/page.tsx, src/app/questionnaire/page.tsx, src/app/clinician/page.tsx
+- Updated root .prettierignore to include apps/telehealth-ui
 - Types cover all domain entities: Patient, Clinician, Specialty, ClinicianSpecialty, StateLicense, AvailabilitySlot, Appointment, HealthQuestionnaire, MatchedClinician, plus type literals for Symptom, CareGoal, Severity, MenopauseStage, VisitType, AppointmentStatus, ClinicianCredential, CancelledBy
-- API client (midiApi.ts) wraps all backend endpoints: listPatients, submitQuestionnaire, matchClinicians, getClinicianDetail, getClinicianSlots, bookAppointment, listAppointments, cancelAppointment, listClinicians
+- API client (telehealthApi.ts) wraps all backend endpoints: listPatients, submitQuestionnaire, matchClinicians, getClinicianDetail, getClinicianSlots, bookAppointment, listAppointments, cancelAppointment, listClinicians
 - **Learnings for future iterations:**
   - shift-ui patterns work well as template — same package.json deps, tsconfig, tailwind config, shadcn components
   - pnpm-workspace.yaml already includes apps/* glob so new apps are auto-discovered
@@ -192,7 +192,7 @@ Started: Wed Mar  4 16:37:23 PST 2026
 
 ## 2026-03-04 - US-012
 - Implemented clinician dashboard page at src/app/clinician/page.tsx
-- Updated midiApi.ts: added completeAppointment function, updated cancelAppointment to accept cancelledBy parameter
+- Updated telehealthApi.ts: added completeAppointment function, updated cancelAppointment to accept cancelledBy parameter
 - Features implemented:
   - Clinician selector dropdown (populated from GET /api/clinicians, shows name + credential)
   - Profile section: name, credential, specialties (primary highlighted with default Badge), licensed states, rating, years experience
@@ -202,7 +202,7 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Complete button on scheduled appointments: PATCH with status:completed
   - Loading and error states handled throughout
   - Inline action loading state prevents double-clicks
-- Files modified: src/app/clinician/page.tsx (full implementation replacing placeholder), src/lib/api/midiApi.ts (added completeAppointment, updated cancelAppointment signature)
+- Files modified: src/app/clinician/page.tsx (full implementation replacing placeholder), src/lib/api/telehealthApi.ts (added completeAppointment, updated cancelAppointment signature)
 - Files also modified: scripts/ralph/prd.json (US-012 passes: true)
 - **Learnings for future iterations:**
   - Badge component doesn't have built-in color variants for status — use className override with outline variant for custom colors
@@ -213,7 +213,7 @@ Started: Wed Mar  4 16:37:23 PST 2026
 
 ## 2026-03-04 - US-013
 - End-to-end verification across patient and clinician flows — all checks pass
-- Verified via curl tests (backend API) with both apps running (midi-api:3004, midi-ui:2027)
+- Verified via curl tests (backend API) with both apps running (telehealth-api:3004, telehealth-ui:2027)
 - Test flow results:
   - Lisa Thompson (CA): questionnaire (hot_flashes+weight_gain, moderate) → matched specialties hrt+weight_glp1
   - Clinician matching: Dr. Sarah Chen ranked #1 (score 0.931, 100% specialty overlap, CA-licensed), Lopez #2, Rivera #3
@@ -226,9 +226,9 @@ Started: Wed Mar  4 16:37:23 PST 2026
   - Cancelled Jennifer's appointment from clinician dashboard → status=cancelled, slot freed (isBooked=false)
   - Patient and clinician views both reflect correct state for all appointments
 - No code changes required — all flows work correctly
-- Typecheck passes for both midi-api and midi-ui
+- Typecheck passes for both telehealth-api and telehealth-ui
 - **Learnings for future iterations:**
   - The PRD AC for US-013 mentions Dr. Foster should appear for FL patients, but this depends on symptom/specialty overlap — Foster's specialties (sleep, general_menopause) may not overlap with the test symptoms
   - Full E2E test sequence: seed → questionnaire → match → book → dashboard verify → cancel → verify slot freed
-  - Both apps must be running for full verification: midi-api on 3004, midi-ui on 2027, PostgreSQL on 54324
+  - Both apps must be running for full verification: telehealth-api on 3004, telehealth-ui on 2027, PostgreSQL on 54324
 ---

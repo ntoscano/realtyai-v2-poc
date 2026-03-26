@@ -14,8 +14,8 @@ import {
 	bookAppointment,
 	getClinicianDetail,
 	getClinicianSlots,
-} from '@/lib/api/midiApi';
-import type { ApiError } from '@/lib/api/midiApi';
+} from '@/lib/api/telehealthApi';
+import type { ApiError } from '@/lib/api/telehealthApi';
 import type { Appointment, AvailabilitySlot, Clinician } from '@/types';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';

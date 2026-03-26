@@ -14,7 +14,7 @@ import {
 	completeAppointment,
 	listAppointments,
 	listClinicians,
-} from '@/lib/api/midiApi';
+} from '@/lib/api/telehealthApi';
 import type { Appointment, Clinician } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 

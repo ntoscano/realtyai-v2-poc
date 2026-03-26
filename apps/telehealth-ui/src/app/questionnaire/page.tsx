@@ -14,7 +14,7 @@ import {
 	listPatients,
 	matchClinicians,
 	submitQuestionnaire,
-} from '@/lib/api/midiApi';
+} from '@/lib/api/telehealthApi';
 import type {
 	CareGoal,
 	MatchedClinician,

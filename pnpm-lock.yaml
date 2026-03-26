@@ -166,125 +166,6 @@ importers:
         specifier: ^5.8.0
         version: 5.10.0
 
-  apps/midi-api:
-    dependencies:
-      '@nestjs/common':
-        specifier: ^10.4.22
-        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2)
-      '@nestjs/core':
-        specifier: ^10.4.22
-        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(@nestjs/websockets@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)
-      '@nestjs/platform-express':
-        specifier: ^10.4.22
-        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@10.4.22)
-      '@nestjs/typeorm':
-        specifier: ^10.0.2
-        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
-      class-transformer:
-        specifier: ^0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: ^0.15.1
-        version: 0.15.1
-      dotenv:
-        specifier: ^16.0.3
-        version: 16.6.1
-      pg:
-        specifier: ^8.11.3
-        version: 8.17.2
-      reflect-metadata:
-        specifier: ^0.1.13
-        version: 0.1.14
-      rxjs:
-        specifier: ^7.8.1
-        version: 7.8.2
-      typeorm:
-        specifier: ^0.3.17
-        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
-      typeorm-naming-strategies:
-        specifier: ^4.1.0
-        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
-    devDependencies:
-      '@nestjs/cli':
-        specifier: ^8.2.8
-        version: 8.2.8(@swc/core@1.15.11)
-      '@nestjs/schematics':
-        specifier: ^8.0.11
-        version: 8.0.11(chokidar@3.5.3)(typescript@5.9.3)
-      '@types/express':
-        specifier: ^4.17.17
-        version: 4.17.25
-      '@types/node':
-        specifier: ^18.11.12
-        version: 18.19.130
-      '@types/pg':
-        specifier: ^8.16.0
-        version: 8.16.0
-      ts-node:
-        specifier: ^10.9.1
-        version: 10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)
-      tsconfig-paths:
-        specifier: ^4.2.0
-        version: 4.2.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  apps/midi-ui:
-    dependencies:
-      '@radix-ui/react-slot':
-        specifier: ^1.2.4
-        version: 1.2.4(@types/react@18.3.27)(react@18.3.1)
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
-      lucide-react:
-        specifier: ^0.563.0
-        version: 0.563.0(react@18.3.1)
-      next:
-        specifier: ^14.2.0
-        version: 14.2.35(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.3.1(react@18.3.1)
-      tailwind-merge:
-        specifier: ^3.4.0
-        version: 3.4.0
-    devDependencies:
-      '@boilertowns-example/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: ^20.11.0
-        version: 20.19.30
-      '@types/react':
-        specifier: ^18.2.0
-        version: 18.3.27
-      '@types/react-dom':
-        specifier: ^18.2.0
-        version: 18.3.7(@types/react@18.3.27)
-      autoprefixer:
-        specifier: ^10.4.23
-        version: 10.4.23(postcss@8.5.6)
-      postcss:
-        specifier: ^8.5.6
-        version: 8.5.6
-      tailwindcss:
-        specifier: ^3.4.19
-        version: 3.4.19(tsx@4.21.0)(yaml@2.8.2)
-      tailwindcss-animate:
-        specifier: ^1.0.7
-        version: 1.0.7(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.2))
-      typescript:
-        specifier: ^5.3.0
-        version: 5.9.3
-
   apps/realty-ai:
     dependencies:
       '@apollo/client':
@@ -395,10 +276,10 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ^0.3.17
-        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
       typeorm-naming-strategies:
         specifier: ^4.1.0
-        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
+        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
       zod:
         specifier: 3.25.32
         version: 3.25.32
@@ -465,10 +346,10 @@ importers:
         version: 7.8.2
       typeorm:
         specifier: ^0.3.17
-        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
       typeorm-naming-strategies:
         specifier: ^4.1.0
-        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
+        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
     devDependencies:
       '@nestjs/cli':
         specifier: ^8.2.8
@@ -496,6 +377,125 @@ importers:
         version: 5.9.3
 
   apps/shift-ui:
+    dependencies:
+      '@radix-ui/react-slot':
+        specifier: ^1.2.4
+        version: 1.2.4(@types/react@18.3.27)(react@18.3.1)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: ^0.563.0
+        version: 0.563.0(react@18.3.1)
+      next:
+        specifier: ^14.2.0
+        version: 14.2.35(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+      tailwind-merge:
+        specifier: ^3.4.0
+        version: 3.4.0
+    devDependencies:
+      '@boilertowns-example/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: ^20.11.0
+        version: 20.19.30
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.27)
+      autoprefixer:
+        specifier: ^10.4.23
+        version: 10.4.23(postcss@8.5.6)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.6
+      tailwindcss:
+        specifier: ^3.4.19
+        version: 3.4.19(tsx@4.21.0)(yaml@2.8.2)
+      tailwindcss-animate:
+        specifier: ^1.0.7
+        version: 1.0.7(tailwindcss@3.4.19(tsx@4.21.0)(yaml@2.8.2))
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  apps/telehealth-api:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(@nestjs/websockets@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@10.4.22)
+      '@nestjs/typeorm':
+        specifier: ^10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.15.1
+        version: 0.15.1
+      dotenv:
+        specifier: ^16.0.3
+        version: 16.6.1
+      pg:
+        specifier: ^8.11.3
+        version: 8.17.2
+      reflect-metadata:
+        specifier: ^0.1.13
+        version: 0.1.14
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+      typeorm:
+        specifier: ^0.3.17
+        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+      typeorm-naming-strategies:
+        specifier: ^4.1.0
+        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
+    devDependencies:
+      '@nestjs/cli':
+        specifier: ^8.2.8
+        version: 8.2.8(@swc/core@1.15.11)
+      '@nestjs/schematics':
+        specifier: ^8.0.11
+        version: 8.0.11(chokidar@3.6.0)(typescript@5.9.3)
+      '@types/express':
+        specifier: ^4.17.17
+        version: 4.17.25
+      '@types/node':
+        specifier: ^18.11.12
+        version: 18.19.130
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
+      ts-node:
+        specifier: ^10.9.1
+        version: 10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)
+      tsconfig-paths:
+        specifier: ^4.2.0
+        version: 4.2.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  apps/telehealth-ui:
     dependencies:
       '@radix-ui/react-slot':
         specifier: ^1.2.4
@@ -681,10 +681,10 @@ importers:
         version: 4.8.3
       typeorm:
         specifier: ^0.3.17
-        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+        version: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
       typeorm-naming-strategies:
         specifier: ^4.1.0
-        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
+        version: 4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))
       zod:
         specifier: 3.25.32
         version: 3.25.32
@@ -18223,17 +18223,6 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
-  '@nestjs/schematics@8.0.11(chokidar@3.5.3)(typescript@5.9.3)':
-    dependencies:
-      '@angular-devkit/core': 13.3.5(chokidar@3.5.3)
-      '@angular-devkit/schematics': 13.3.5(chokidar@3.5.3)
-      fs-extra: 10.1.0
-      jsonc-parser: 3.0.0
-      pluralize: 8.0.0
-      typescript: 5.9.3
-    transitivePeerDependencies:
-      - chokidar
-
   '@nestjs/schematics@8.0.11(chokidar@3.6.0)(typescript@5.9.3)':
     dependencies:
       '@angular-devkit/core': 13.3.5(chokidar@3.6.0)
@@ -18262,7 +18251,7 @@ snapshots:
       '@nestjs/core': 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/platform-express@10.4.22)(@nestjs/websockets@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)
       reflect-metadata: 0.1.14
       rxjs: 7.8.2
-      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
       uuid: 9.0.1
 
   '@nestjs/typeorm@8.1.4(@nestjs/common@8.4.7(cache-manager@7.2.8)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@8.4.7)(reflect-metadata@0.1.14)(rxjs@7.8.2)(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)))':
@@ -18271,7 +18260,7 @@ snapshots:
       '@nestjs/core': 8.4.7(@nestjs/common@8.4.7(cache-manager@7.2.8)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/platform-express@8.4.7)(reflect-metadata@0.1.14)(rxjs@7.8.2)
       reflect-metadata: 0.1.14
       rxjs: 7.8.2
-      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
       uuid: 8.3.2
 
   '@nestjs/websockets@10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@10.4.22)(@nestjs/platform-socket.io@10.4.22)(reflect-metadata@0.1.14)(rxjs@7.8.2)':
@@ -30958,11 +30947,11 @@ snapshots:
 
   typedarray@0.0.6: {}
 
-  typeorm-naming-strategies@4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))):
+  typeorm-naming-strategies@4.1.0(typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))):
     dependencies:
-      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
+      typeorm: 0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3))
 
-  typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(gcp-metadata@8.1.2)(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)):
+  typeorm@0.3.28(babel-plugin-macros@3.1.0)(better-sqlite3@12.6.2)(ioredis@5.10.0)(mongodb@6.20.0(socks@2.8.7))(pg@8.17.2)(redis@4.7.1)(ts-node@10.9.2(@swc/core@1.15.11)(@types/node@18.19.130)(typescript@5.9.3)):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.2.0

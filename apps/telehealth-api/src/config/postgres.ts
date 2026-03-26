@@ -14,7 +14,7 @@ export function getConfig(): PostgresConfig {
 		port: parseInt(process.env.POSTGRES_PORT || '54324', 10),
 		user: process.env.POSTGRES_USER || 'postgres',
 		password: process.env.POSTGRES_PASSWORD || 'docker',
-		database: process.env.POSTGRES_DB || 'midi_matching',
+		database: process.env.POSTGRES_DB || 'telehealth_matching',
 	};
 }
 
