@@ -38,7 +38,7 @@ export default function Home() {
 		setError(null);
 
 		try {
-			const response = await fetch('/api/generate-email', {
+			const response = await fetch('http://localhost:3001/api/generate-email', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

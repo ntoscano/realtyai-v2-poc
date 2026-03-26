@@ -1,4 +1,4 @@
-import type { GeneratedEmail } from '@/types/email';
+import type { GeneratedEmail } from '../types/email.types';
 import { z } from 'zod';
 
 /**

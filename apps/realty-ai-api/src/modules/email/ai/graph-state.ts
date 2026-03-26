@@ -1,7 +1,9 @@
-import type { Client } from '@/types/client';
-import type { GeneratedEmail } from '@/types/email';
-import type { Property } from '@/types/property';
 import { Annotation } from '@langchain/langgraph';
+import type {
+	EmailClient,
+	EmailProperty,
+	GeneratedEmail,
+} from '../types/email.types';
 
 /**
  * Weather context for the property location
@@ -25,11 +27,11 @@ export type WeatherContext = {
  * - generated_email: The final generated email output
  */
 export const EmailGraphState = Annotation.Root({
-	client: Annotation<Client | null>({
+	client: Annotation<EmailClient | null>({
 		reducer: (_, newVal) => newVal,
 		default: () => null,
 	}),
-	property: Annotation<Property | null>({
+	property: Annotation<EmailProperty | null>({
 		reducer: (_, newVal) => newVal,
 		default: () => null,
 	}),

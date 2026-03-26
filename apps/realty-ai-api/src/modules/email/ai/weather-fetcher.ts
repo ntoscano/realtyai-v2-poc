@@ -1,4 +1,4 @@
-import type { WeatherContext } from './graphState';
+import type { WeatherContext } from './graph-state';
 
 /**
  * WeatherAPI.com response type

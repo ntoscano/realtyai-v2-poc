@@ -1,14 +1,14 @@
-import type { GeneratedEmail } from '@/types/email';
+import type { GeneratedEmail } from '../types/email.types';
 import {
 	createClientDocument,
 	createPropertyDocument,
 	getRealtorPlaybookDocument,
-} from './documentLoaders';
-import { emailPromptTemplate } from './emailPrompt';
-import { validateEmail } from './emailValidator';
-import type { EmailGraphStateType } from './graphState';
+} from './document-loaders';
+import { emailPromptTemplate } from './email-prompt';
+import { validateEmail } from './email-validator';
+import type { EmailGraphStateType } from './graph-state';
 import { llm } from './llm';
-import { fetchWeather } from './weatherFetcher';
+import { fetchWeather } from './weather-fetcher';
 
 const MAX_GENERATION_ATTEMPTS = 3;
 

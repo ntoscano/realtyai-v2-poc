@@ -6,7 +6,7 @@ module.exports = class RealtyAIProvider {
 	async callApi(prompt, context) {
 		const { vars } = context;
 
-		const response = await fetch('http://localhost:2024/api/generate-email', {
+		const response = await fetch('http://localhost:3001/api/generate-email', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({

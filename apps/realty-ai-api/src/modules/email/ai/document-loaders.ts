@@ -1,12 +1,11 @@
-import type { Client } from '@/types/client';
-import type { Property } from '@/types/property';
+import type { EmailClient, EmailProperty } from '../types/email.types';
 import { Document } from '@langchain/core/documents';
 
 /**
- * Creates a LangChain Document from a Client object.
+ * Creates a LangChain Document from an EmailClient object.
  * The document contains client details as pageContent for RAG retrieval.
  */
-export function createClientDocument(client: Client): Document {
+export function createClientDocument(client: EmailClient): Document {
 	const pageContent = `
 Client: ${client.name}
 Email: ${client.email}
@@ -27,10 +26,10 @@ Lifestyle Notes: ${client.lifestyle_notes}
 }
 
 /**
- * Creates a LangChain Document from a Property object.
+ * Creates a LangChain Document from an EmailProperty object.
  * The document contains property details as pageContent for RAG retrieval.
  */
-export function createPropertyDocument(property: Property): Document {
+export function createPropertyDocument(property: EmailProperty): Document {
 	const formattedPrice = new Intl.NumberFormat('en-US', {
 		style: 'currency',
 		currency: 'USD',

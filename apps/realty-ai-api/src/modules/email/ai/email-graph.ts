@@ -1,5 +1,5 @@
 import { END, START, StateGraph } from '@langchain/langgraph';
-import { EmailGraphState } from './graphState';
+import { EmailGraphState } from './graph-state';
 import {
 	contextRetrievalNode,
 	generationNode,
